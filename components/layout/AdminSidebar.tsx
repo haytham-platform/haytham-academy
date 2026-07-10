@@ -36,7 +36,7 @@ const adminLinks: {
   { href: "/admin/enrollments", label: "التسجيلات", icon: ClipboardList, permission: "enrollments.view" },
   { href: "/admin/transport", label: "النقل", icon: Bus, permission: "transport.view" },
   { href: "/admin/reports", label: "التقارير", icon: FileBarChart, permission: "reports.view" },
-  { href: "/admin/finance", label: "الحسابات والمالية", icon: Wallet, permission: "finance.manage" },
+  { href: "/admin/finance", label: "الحسابات والمالية", icon: Wallet, permission: "finance.view" },
   { href: "/admin/news", label: "الأخبار", icon: Newspaper, permission: "news.manage" },
   { href: "/admin/settings", label: "الإعدادات", icon: Settings, permission: "settings.manage" },
 ];

@@ -10,17 +10,41 @@ interface PeriodStats {
   income: number;
   expenses: number;
   paidTeacherPayouts: number;
+  outstandingTeacherBalances: number;
+  outstandingStudentBalances: number;
   netProfit: number;
   paymentCount: number;
 }
 
 interface Summary {
   today: PeriodStats;
+  week: PeriodStats;
   month: PeriodStats;
   year: PeriodStats;
   totalPayments: number;
+  cashbox: {
+    openingBalance: number;
+    currentBalance: number;
+    openingToday: number;
+    todayIn: number;
+    todayOut: number;
+    expectedCash: number;
+    actualCash: number | null;
+    difference: number | null;
+    closure: {
+      _id: string;
+      actualCash: number;
+      expectedCash: number;
+      difference: number;
+      status: string;
+      approvalStatus: string;
+      note: string;
+      updatedAt: string;
+    } | null;
+  };
   recentPayments: Array<{
     _id: string;
+    receiptNumber?: string;
     studentName?: string;
     courseTitle?: string;
     amount: number;
@@ -29,6 +53,7 @@ interface Summary {
   }>;
   recentExpenses: Array<{
     _id: string;
+    expenseNumber?: string;
     title: string;
     amount: number;
     category: string;
@@ -38,10 +63,18 @@ interface Summary {
     _id: string;
     teacherName?: string;
     amount: number;
+    remaining: number;
     status: string;
     payoutDate: string;
   }>;
 }
+
+const periods: Array<{ key: keyof Pick<Summary, "today" | "week" | "month" | "year">; title: string }> = [
+  { key: "today", title: "اليوم" },
+  { key: "week", title: "هذا الأسبوع" },
+  { key: "month", title: "هذا الشهر" },
+  { key: "year", title: "هذه السنة" },
+];
 
 export default function FinanceOverview() {
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -49,7 +82,7 @@ export default function FinanceOverview() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    fetch("/api/admin/finance/summary")
+    fetch("/api/admin/finance/summary", { cache: "no-store" })
       .then((r) => r.json())
       .then((d) => {
         if (d.error) setError(d.error);
@@ -73,33 +106,45 @@ export default function FinanceOverview() {
 
   return (
     <div className="space-y-8">
-      <section>
-        <h3 className="mb-4 text-lg font-bold">اليوم</h3>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard title="دخل اليوم" value={summary.today.income} variant="success" />
-          <StatCard title="مصاريف اليوم" value={summary.today.expenses} variant="danger" />
-          <StatCard title="مستحقات مدفوعة" value={summary.today.paidTeacherPayouts} />
-          <StatCard title="أرباح اليوم" value={summary.today.netProfit} variant="primary" />
-        </div>
-      </section>
+      {periods.map((period) => {
+        const data = summary[period.key];
+        return (
+          <section key={period.key}>
+            <h3 className="mb-4 text-lg font-bold">{period.title}</h3>
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+              <StatCard title="الدخل" value={data.income} variant="success" />
+              <StatCard title="المصاريف" value={data.expenses} variant="danger" />
+              <StatCard title="الأرباح" value={data.netProfit} variant="primary" />
+              <StatCard title="مدفوعات الأساتذة" value={data.paidTeacherPayouts} />
+              <StatCard title="مستحقات الطلاب" value={data.outstandingStudentBalances} />
+              <StatCard title="باقي الأساتذة" value={data.outstandingTeacherBalances} />
+            </div>
+          </section>
+        );
+      })}
 
       <section>
-        <h3 className="mb-4 text-lg font-bold">هذا الشهر</h3>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard title="دخل الشهر" value={summary.month.income} variant="success" />
-          <StatCard title="مصاريف الشهر" value={summary.month.expenses} variant="danger" />
-          <StatCard title="مستحقات مدفوعة" value={summary.month.paidTeacherPayouts} />
-          <StatCard title="أرباح الشهر" value={summary.month.netProfit} variant="primary" />
-        </div>
-      </section>
-
-      <section>
-        <h3 className="mb-4 text-lg font-bold">هذه السنة</h3>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatCard title="دخل السنة" value={summary.year.income} variant="success" />
-          <StatCard title="مصاريف السنة" value={summary.year.expenses} variant="danger" />
-          <StatCard title="مستحقات مدفوعة" value={summary.year.paidTeacherPayouts} />
-          <StatCard title="أرباح السنة" value={summary.year.netProfit} variant="primary" />
+        <h3 className="mb-4 text-lg font-bold">الصندوق اليومي</h3>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+          <StatCard title="الرصيد الافتتاحي" value={summary.cashbox.openingToday} />
+          <StatCard title="دخل الصندوق" value={summary.cashbox.todayIn} variant="success" />
+          <StatCard title="خروج الصندوق" value={summary.cashbox.todayOut} variant="danger" />
+          <StatCard title="الرصيد المتوقع" value={summary.cashbox.expectedCash} variant="primary" />
+          {summary.cashbox.closure ? (
+            <>
+              <StatCard title="النقد الفعلي" value={summary.cashbox.actualCash ?? 0} variant="success" />
+              <StatCard
+                title="الفرق"
+                value={summary.cashbox.difference ?? 0}
+                variant={(summary.cashbox.difference ?? 0) === 0 ? "success" : "danger"}
+              />
+            </>
+          ) : (
+            <Card className="!p-4 sm:col-span-2">
+              <p className="text-sm text-muted">الإغلاق اليومي</p>
+              <p className="mt-1 text-sm font-medium">لا يوجد إغلاق نقدي لهذا اليوم</p>
+            </Card>
+          )}
         </div>
       </section>
 
@@ -119,7 +164,7 @@ export default function FinanceOverview() {
                 <li key={p._id} className="flex justify-between gap-2 border-b border-border pb-2">
                   <div>
                     <p className="font-medium">{p.studentName}</p>
-                    <p className="text-xs text-muted">{p.courseTitle}</p>
+                    <p className="text-xs text-muted">{p.receiptNumber || p.courseTitle}</p>
                   </div>
                   <div className="text-end">
                     <p className="font-bold text-primary">{formatCurrency(p.amount)}</p>
@@ -139,7 +184,10 @@ export default function FinanceOverview() {
             <ul className="space-y-3 text-sm">
               {summary.recentExpenses.map((e) => (
                 <li key={e._id} className="flex justify-between gap-2 border-b border-border pb-2">
-                  <p className="font-medium">{e.title}</p>
+                  <div>
+                    <p className="font-medium">{e.title}</p>
+                    <p className="text-xs text-muted">{e.expenseNumber}</p>
+                  </div>
                   <div className="text-end">
                     <p className="font-bold text-red-600">{formatCurrency(e.amount)}</p>
                     <p className="text-xs text-muted">{formatDate(e.expenseDate)}</p>
@@ -161,7 +209,7 @@ export default function FinanceOverview() {
                   <div>
                     <p className="font-medium">{p.teacherName}</p>
                     <p className="text-xs text-muted">
-                      {p.status === "paid" ? "مدفوع" : "معلق"}
+                      {p.status === "paid" ? "مدفوع" : `متبقي ${formatCurrency(p.remaining || 0)}`}
                     </p>
                   </div>
                   <div className="text-end">

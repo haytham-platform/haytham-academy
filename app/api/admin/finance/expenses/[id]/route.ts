@@ -1,12 +1,13 @@
 import { connectDB } from "@/lib/db";
 import Expense from "@/models/Expense";
-import { requireFinance } from "@/lib/auth-helpers";
+import { requireFinanceDelete, requireFinanceManager } from "@/lib/auth-helpers";
 import {
   formatExpense,
   validateAmount,
   validateDate,
 } from "@/lib/finance";
 import { reverseSourceEntry } from "@/lib/cashbox";
+import { recordFinancialAudit } from "@/lib/audit";
 import { successResponse, errorResponse } from "@/lib/api-response";
 
 export async function PUT(
@@ -14,7 +15,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { error } = await requireFinance();
+    const { user, error } = await requireFinanceManager();
     if (error) return error;
 
     const { id } = await params;
@@ -36,8 +37,16 @@ export async function PUT(
     }
     if (body.note !== undefined) update.note = body.note?.trim() || "";
 
-    const expense = await Expense.findByIdAndUpdate(id, update, { new: true }).lean();
+    const expense = await Expense.findByIdAndUpdate(id, update, { returnDocument: "after" }).lean();
     if (!expense) return errorResponse("المصروف غير موجود", 404);
+
+    await recordFinancialAudit({
+      userId: user!._id,
+      action: "expense.update",
+      recordType: "expense",
+      recordId: id,
+      metadata: update,
+    });
 
     return successResponse({
       expense: formatExpense(expense),
@@ -53,7 +62,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { user, error } = await requireFinance();
+    const { user, error } = await requireFinanceDelete();
     if (error) return error;
 
     const { id } = await params;
@@ -70,6 +79,17 @@ export async function DELETE(
       user!._id,
       "out"
     );
+
+    await recordFinancialAudit({
+      userId: user!._id,
+      action: "expense.delete",
+      recordType: "expense",
+      recordId: id,
+      metadata: {
+        expenseNumber: expense.expenseNumber,
+        amount: expense.amount,
+      },
+    });
 
     return successResponse({ message: "تم حذف المصروف بنجاح" });
   } catch (err) {

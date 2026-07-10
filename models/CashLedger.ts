@@ -2,6 +2,7 @@ import mongoose, { Schema, type Document, type Model, Types } from "mongoose";
 
 export type LedgerType = "income" | "expense" | "teacher_payout" | "adjustment";
 export type LedgerDirection = "in" | "out";
+export type LedgerStatus = "pending" | "approved" | "rejected" | "posted" | "reversed";
 export type LedgerSourceType =
   | "payment"
   | "expense"
@@ -15,7 +16,14 @@ export interface ICashLedger extends Document {
   direction: LedgerDirection;
   sourceType: LedgerSourceType;
   sourceId?: Types.ObjectId;
+  category?: string;
   description: string;
+  studentId?: Types.ObjectId;
+  teacherId?: Types.ObjectId;
+  courseId?: Types.ObjectId;
+  paymentMethod?: string;
+  status: LedgerStatus;
+  notes?: string;
   balanceBefore: number;
   balanceAfter: number;
   createdBy: Types.ObjectId;
@@ -37,7 +45,18 @@ const CashLedgerSchema = new Schema<ICashLedger>(
       required: true,
     },
     sourceId: { type: Schema.Types.ObjectId },
+    category: { type: String, trim: true },
     description: { type: String, required: true, trim: true },
+    studentId: { type: Schema.Types.ObjectId, ref: "User" },
+    teacherId: { type: Schema.Types.ObjectId, ref: "Teacher" },
+    courseId: { type: Schema.Types.ObjectId, ref: "Course" },
+    paymentMethod: { type: String, trim: true },
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected", "posted", "reversed"],
+      default: "posted",
+    },
+    notes: { type: String, trim: true },
     balanceBefore: { type: Number, required: true },
     balanceAfter: { type: Number, required: true },
     createdBy: { type: Schema.Types.ObjectId, ref: "User", required: true },
@@ -48,6 +67,10 @@ const CashLedgerSchema = new Schema<ICashLedger>(
 CashLedgerSchema.index({ createdAt: -1 });
 CashLedgerSchema.index({ sourceType: 1, sourceId: 1 });
 CashLedgerSchema.index({ type: 1 });
+CashLedgerSchema.index({ status: 1, createdAt: -1 });
+CashLedgerSchema.index({ studentId: 1, createdAt: -1 });
+CashLedgerSchema.index({ teacherId: 1, createdAt: -1 });
+CashLedgerSchema.index({ courseId: 1, createdAt: -1 });
 
 if (process.env.NODE_ENV === "development" && mongoose.models.CashLedger) {
   delete mongoose.models.CashLedger;

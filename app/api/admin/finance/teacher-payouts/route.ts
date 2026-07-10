@@ -1,17 +1,18 @@
 import { connectDB } from "@/lib/db";
 import TeacherPayout from "@/models/TeacherPayout";
-import { requireFinance } from "@/lib/auth-helpers";
+import { requireFinancePayout } from "@/lib/auth-helpers";
 import {
   formatPayout,
-  validateAmount,
   validateDate,
 } from "@/lib/finance";
 import { recordPayoutOut } from "@/lib/cashbox";
+import { notifyFinance } from "@/lib/notifications";
+import { recordFinancialAudit } from "@/lib/audit";
 import { successResponse, errorResponse } from "@/lib/api-response";
 
 export async function GET(request: Request) {
   try {
-    const { error } = await requireFinance();
+    const { error } = await requireFinancePayout();
     if (error) return error;
 
     await connectDB();
@@ -54,15 +55,17 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { user, error } = await requireFinance();
+    const { user, error } = await requireFinancePayout();
     if (error) return error;
 
     const body = await request.json();
-    const amount = validateAmount(body.amount);
+    const paidAmount = Number(body.paid ?? body.amount ?? 0);
+    const totalDueInput = Number(body.totalDue || 0);
     const payoutDate = validateDate(body.payoutDate);
 
     if (!body.teacherId) return errorResponse("الأستاذ مطلوب");
-    if (!amount) return errorResponse("المبلغ يجب أن يكون أكبر من صفر");
+    if (!Number.isFinite(paidAmount) || paidAmount < 0) return errorResponse("المبلغ المدفوع غير صالح");
+    if (!Number.isFinite(totalDueInput) || totalDueInput < 0) return errorResponse("إجمالي المستحق غير صالح");
     if (!payoutDate) return errorResponse("تاريخ المستحق غير صالح");
 
     await connectDB();
@@ -70,7 +73,13 @@ export async function POST(request: Request) {
     const payout = await TeacherPayout.create({
       teacherId: body.teacherId,
       courseId: body.courseId || undefined,
-      amount,
+      numberOfSessions: Number(body.numberOfSessions || 0),
+      extraSessions: Number(body.extraSessions || 0),
+      sessionRate: Number(body.sessionRate || 0),
+      manualAdjustment: Number(body.manualAdjustment || 0),
+      totalDue: totalDueInput,
+      paid: paidAmount,
+      amount: paidAmount,
       payoutType: body.payoutType || "fixed",
       payoutDate,
       note: body.note?.trim() || "",
@@ -81,11 +90,46 @@ export async function POST(request: Request) {
     if (payout.status === "paid") {
       await recordPayoutOut(
         payout._id.toString(),
-        amount,
+        paidAmount,
         `مستحق أستاذ — ${body.note?.trim() || "بدون ملاحظة"}`,
-        user!._id
+        user!._id,
+        {
+          teacherId: String(body.teacherId),
+          courseId: body.courseId ? String(body.courseId) : undefined,
+          notes: body.note?.trim() || "",
+        }
       );
+      await notifyFinance({
+        title: "تم دفع مستحق أستاذ",
+        message: `تم دفع مستحق أستاذ بقيمة ${paidAmount}`,
+        type: "warning",
+        createdBy: user!._id,
+        data: {
+          payoutId: payout._id.toString(),
+          teacherId: body.teacherId,
+          courseId: body.courseId || undefined,
+          amount: paidAmount,
+          recordedBy: user!.name,
+          time: new Date().toISOString(),
+        },
+      });
     }
+
+    await recordFinancialAudit({
+      userId: user!._id,
+      action: payout.status === "paid" ? "teacher_payout.pay" : "teacher_payout.create",
+      recordType: "teacher_payout",
+      recordId: payout._id.toString(),
+      metadata: {
+        teacherId: body.teacherId,
+        courseId: body.courseId || undefined,
+        totalDue: payout.totalDue,
+        paid: payout.paid,
+        remaining: payout.remaining,
+        numberOfSessions: payout.numberOfSessions,
+        extraSessions: payout.extraSessions,
+      },
+    });
 
     const populated = await TeacherPayout.findById(payout._id)
       .populate("teacherId", "name subject")

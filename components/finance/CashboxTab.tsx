@@ -16,7 +16,17 @@ interface CashboxData {
   todayIn: number;
   todayOut: number;
   netToday: number;
+  expectedCashToday: number;
   currency: string;
+  closure?: {
+    _id: string;
+    actualCash: number;
+    expectedCash: number;
+    difference: number;
+    status: string;
+    approvalStatus: string;
+    note?: string;
+  } | null;
 }
 
 interface LedgerEntry {
@@ -45,7 +55,9 @@ export default function CashboxTab() {
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [closeModalOpen, setCloseModalOpen] = useState(false);
   const [adjForm, setAdjForm] = useState({ amount: "", direction: "in", reason: "" });
+  const [closeForm, setCloseForm] = useState({ actualCash: "", note: "" });
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
@@ -115,6 +127,29 @@ export default function CashboxTab() {
     setTimeout(() => setMessage(""), 3000);
   }
 
+  async function handleCloseCash(e: React.FormEvent) {
+    e.preventDefault();
+    setError("");
+    const res = await fetch("/api/admin/finance/cashbox/close", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        actualCash: Number(closeForm.actualCash),
+        note: closeForm.note,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setError(data.error || "حدث خطأ");
+      return;
+    }
+    setMessage("تم إغلاق صندوق اليوم");
+    setCloseModalOpen(false);
+    setCloseForm({ actualCash: "", note: "" });
+    loadData();
+    setTimeout(() => setMessage(""), 3000);
+  }
+
   if (loading && !cashbox) {
     return <p className="py-12 text-center text-muted">جاري التحميل...</p>;
   }
@@ -136,6 +171,17 @@ export default function CashboxTab() {
         <StatCard title="صافي اليوم" value={cashbox?.netToday ?? 0} variant="success" />
         <StatCard title="دخل اليوم" value={cashbox?.todayIn ?? 0} variant="success" />
         <StatCard title="خرج اليوم" value={cashbox?.todayOut ?? 0} variant="danger" />
+        <StatCard title="المتوقع اليوم" value={cashbox?.expectedCashToday ?? 0} />
+        <StatCard
+          title="النقد الفعلي"
+          value={cashbox?.closure?.actualCash ?? 0}
+          subtitle={cashbox?.closure ? `${cashbox.closure.status} / ${cashbox.closure.approvalStatus}` : "لم يغلق"}
+        />
+        <StatCard
+          title="فرق الصندوق"
+          value={cashbox?.closure?.difference ?? 0}
+          variant={cashbox?.closure?.difference === 0 ? "success" : "danger"}
+        />
       </div>
 
       <div className="flex flex-wrap gap-3">
@@ -152,6 +198,7 @@ export default function CashboxTab() {
         <Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
         <Input type="date" value={to} onChange={(e) => setTo(e.target.value)} />
         <Button onClick={loadData}>تطبيق</Button>
+        <Button onClick={() => setCloseModalOpen(true)} variant="outline">إغلاق صندوق اليوم</Button>
         <Button onClick={() => setModalOpen(true)} className="mr-auto">
           <Plus className="h-4 w-4" /> تعديل يدوي
         </Button>
@@ -227,6 +274,32 @@ export default function CashboxTab() {
             onChange={(e) => setAdjForm({ ...adjForm, reason: e.target.value })}
           />
           <Button type="submit" fullWidth>تسجيل التعديل</Button>
+        </form>
+      </Modal>
+
+      <Modal open={closeModalOpen} onClose={() => setCloseModalOpen(false)} title="إغلاق صندوق اليوم">
+        <form onSubmit={handleCloseCash} className="space-y-4">
+          {error && (
+            <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</div>
+          )}
+          <div className="rounded-xl border border-border p-3 text-sm">
+            <p className="text-muted">النقد المتوقع اليوم</p>
+            <p className="text-xl font-bold">{formatCurrency(cashbox?.expectedCashToday ?? 0)}</p>
+          </div>
+          <Input
+            label="النقد الفعلي اليوم"
+            type="number"
+            min="0"
+            required
+            value={closeForm.actualCash}
+            onChange={(e) => setCloseForm({ ...closeForm, actualCash: e.target.value })}
+          />
+          <Input
+            label="ملاحظات"
+            value={closeForm.note}
+            onChange={(e) => setCloseForm({ ...closeForm, note: e.target.value })}
+          />
+          <Button type="submit" fullWidth>إغلاق الصندوق</Button>
         </form>
       </Modal>
     </div>

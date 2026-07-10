@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { cn } from "@/lib/utils";
+import { hasPermission, type Permission } from "@/lib/permissions";
 import Title from "@/components/ui/Title";
 import FinanceOverview from "./FinanceOverview";
 import PaymentsTab from "./PaymentsTab";
@@ -11,40 +12,56 @@ import ReportsTab from "./ReportsTab";
 import CashboxTab from "./CashboxTab";
 import LessonInvoicesTab from "./LessonInvoicesTab";
 import TeacherAccountTab from "./TeacherAccountTab";
+import NotificationsTab from "./NotificationsTab";
+import type { UserRole } from "@/types";
 
 const TABS = [
-  { id: "overview", label: "Overview" },
-  { id: "cashbox", label: "الصندوق" },
-  { id: "lesson-invoices", label: "الحصص والفواتير" },
-  { id: "teacher-account", label: "حساب الأستاذ" },
-  { id: "payments", label: "المدفوعات" },
-  { id: "expenses", label: "المصاريف" },
-  { id: "payouts", label: "مستحقات الأساتذة" },
-  { id: "reports", label: "التقارير" },
+  { id: "overview", label: "Overview", permission: "finance.view" },
+  { id: "cashbox", label: "الصندوق", permission: "finance.cash" },
+  { id: "lesson-invoices", label: "الحصص والفواتير", permission: "finance.payments" },
+  { id: "teacher-account", label: "حساب الأستاذ", permission: "finance.payouts" },
+  { id: "payments", label: "المدفوعات", permission: "finance.payments" },
+  { id: "expenses", label: "المصاريف", permission: "finance.expenses" },
+  { id: "payouts", label: "مستحقات الأساتذة", permission: "finance.payouts" },
+  { id: "reports", label: "التقارير", permission: "finance.reports" },
+  { id: "notifications", label: "الإشعارات", permission: "finance.view" },
 ] as const;
 
 type TabId = (typeof TABS)[number]["id"];
 
 export default function FinanceDashboard() {
   const [tab, setTab] = useState<TabId>("overview");
+  const [role, setRole] = useState<UserRole | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/me")
+      .then((r) => r.json())
+      .then((d) => setRole(d.user?.role ?? null))
+      .catch(() => setRole(null));
+  }, []);
+
+  const visibleTabs = role
+    ? TABS.filter((t) => hasPermission(role, t.permission as Permission))
+    : TABS.filter((t) => t.id === "overview");
+  const activeTab = visibleTabs.some((t) => t.id === tab) ? tab : "overview";
 
   return (
     <div>
       <Title
         title="الحسابات والمالية"
-        subtitle="إدارة المدفوعات والمصاريف ومستحقات الأساتذة والتقارير المالية"
+        subtitle="إدارة المدفوعات والمصاريف ومستحقات الأساتذة والصندوق والتقارير المالية"
         className="mb-6"
       />
 
       <div className="mb-6 flex flex-wrap gap-2 border-b border-border pb-2">
-        {TABS.map((t) => (
+        {visibleTabs.map((t) => (
           <button
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
             className={cn(
               "rounded-xl px-4 py-2 text-sm font-medium transition",
-              tab === t.id
+              activeTab === t.id
                 ? "bg-primary text-white"
                 : "text-muted hover:bg-pink-50 hover:text-primary"
             )}
@@ -54,14 +71,15 @@ export default function FinanceDashboard() {
         ))}
       </div>
 
-      {tab === "overview" && <FinanceOverview />}
-      {tab === "cashbox" && <CashboxTab />}
-      {tab === "lesson-invoices" && <LessonInvoicesTab />}
-      {tab === "teacher-account" && <TeacherAccountTab />}
-      {tab === "payments" && <PaymentsTab />}
-      {tab === "expenses" && <ExpensesTab />}
-      {tab === "payouts" && <PayoutsTab />}
-      {tab === "reports" && <ReportsTab />}
+      {activeTab === "overview" && <FinanceOverview />}
+      {activeTab === "cashbox" && <CashboxTab />}
+      {activeTab === "lesson-invoices" && <LessonInvoicesTab />}
+      {activeTab === "teacher-account" && <TeacherAccountTab />}
+      {activeTab === "payments" && <PaymentsTab />}
+      {activeTab === "expenses" && <ExpensesTab />}
+      {activeTab === "payouts" && <PayoutsTab />}
+      {activeTab === "reports" && <ReportsTab />}
+      {activeTab === "notifications" && <NotificationsTab />}
     </div>
   );
 }

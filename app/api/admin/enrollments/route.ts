@@ -1,9 +1,11 @@
+import mongoose from "mongoose";
 import { connectDB } from "@/lib/db";
 import Enrollment from "@/models/Enrollment";
 import User from "@/models/User";
 import Course from "@/models/Course";
 import { requirePermission } from "@/lib/auth-helpers";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import { handleRouteError } from "@/lib/api-errors";
 import { formatEnrollment } from "@/lib/academic";
 import {
   normalizeEnrollmentStatus,
@@ -15,7 +17,11 @@ import {
   parseSort,
 } from "@/lib/pagination";
 
-function buildEnrollmentFilter(searchParams: URLSearchParams) {
+function isValidObjectId(value: unknown): value is string {
+  return typeof value === "string" && mongoose.Types.ObjectId.isValid(value);
+}
+
+async function buildEnrollmentFilter(searchParams: URLSearchParams) {
   const status = searchParams.get("status");
   const courseId = searchParams.get("courseId");
   const studentId = searchParams.get("studentId");
@@ -24,17 +30,53 @@ function buildEnrollmentFilter(searchParams: URLSearchParams) {
   const filter: Record<string, unknown> = {};
   if (status) {
     const normalized = normalizeEnrollmentStatus(status);
-    if (normalized) {
-      filter.status =
-        normalized === "approved"
-          ? { $in: ["approved", "accepted"] }
-          : normalized;
+    if (!normalized) {
+      return { filter, error: errorResponse("حالة غير صالحة") };
     }
+    filter.status =
+      normalized === "approved"
+        ? { $in: ["approved", "accepted"] }
+        : normalized;
   }
-  if (courseId) filter.course = courseId;
-  if (studentId) filter.student = studentId;
+  if (courseId) {
+    if (!isValidObjectId(courseId)) {
+      return { filter, error: errorResponse("الدورة غير صالحة") };
+    }
+    filter.course = courseId;
+  }
+  if (studentId) {
+    if (!isValidObjectId(studentId)) {
+      return { filter, error: errorResponse("الطالب غير صالح") };
+    }
+    filter.student = studentId;
+  }
 
-  return { filter, search };
+  if (search) {
+    const [students, courses] = await Promise.all([
+      User.find({
+        role: "student",
+        $or: [
+          { name: { $regex: search, $options: "i" } },
+          { phone: { $regex: search, $options: "i" } },
+        ],
+      }).select("_id"),
+      Course.find({
+        deletedAt: null,
+        title: { $regex: search, $options: "i" },
+      }).select("_id"),
+    ]);
+
+    const searchOr: Record<string, unknown>[] = [];
+    if (students.length) {
+      searchOr.push({ student: { $in: students.map((s) => s._id) } });
+    }
+    if (courses.length) {
+      searchOr.push({ course: { $in: courses.map((c) => c._id) } });
+    }
+    filter.$or = searchOr.length ? searchOr : [{ _id: null }];
+  }
+
+  return { filter, error: null };
 }
 
 export async function GET(request: Request) {
@@ -44,31 +86,23 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const pagination = parsePagination(searchParams);
-    const sort = parseSort(searchParams, ["createdAt", "status"], "createdAt");
-    const { filter, search } = buildEnrollmentFilter(searchParams);
+    const sort = parseSort(searchParams, ["createdAt", "updatedAt", "status"], "createdAt");
 
     await connectDB();
 
-    if (search) {
-      const students = await User.find({
-        role: "student",
-        $or: [
-          { name: { $regex: search, $options: "i" } },
-          { phone: { $regex: search, $options: "i" } },
-        ],
-      }).select("_id");
-      filter.student = { $in: students.map((s) => s._id) };
-    }
+    const built = await buildEnrollmentFilter(searchParams);
+    if (built.error) return built.error;
 
     const [enrollments, total] = await Promise.all([
-      Enrollment.find(filter)
+      Enrollment.find(built.filter)
         .populate("student", "name phone")
         .populate({ path: "course", populate: { path: "teacher", select: "name" } })
+        .populate("createdBy", "name role")
         .sort(sort)
         .skip(pagination.skip)
         .limit(pagination.limit)
         .lean(),
-      Enrollment.countDocuments(filter),
+      Enrollment.countDocuments(built.filter),
     ]);
 
     return successResponse({
@@ -76,8 +110,7 @@ export async function GET(request: Request) {
       pagination: buildPaginationMeta(total, pagination),
     });
   } catch (err) {
-    console.error("Admin enrollments GET:", err);
-    return errorResponse("حدث خطأ", 500);
+    return handleRouteError("Admin enrollments GET", err);
   }
 }
 
@@ -87,47 +120,57 @@ export async function POST(request: Request) {
     if (error) return error;
 
     const body = await request.json();
-    const { studentId, courseId } = body;
+    const studentId = typeof body.studentId === "string" ? body.studentId.trim() : "";
+    const courseId = typeof body.courseId === "string" ? body.courseId.trim() : "";
     const statusInput = normalizeEnrollmentStatus(body.status || "pending");
 
     if (!studentId) return errorResponse("الطالب مطلوب");
+    if (!isValidObjectId(studentId)) return errorResponse("الطالب غير صالح");
     if (!courseId) return errorResponse("الدورة مطلوبة");
+    if (!isValidObjectId(courseId)) return errorResponse("الدورة غير صالحة");
     if (!statusInput) return errorResponse("حالة غير صالحة");
 
     await connectDB();
 
-    const student = await User.findOne({
-      _id: studentId,
-      role: "student",
-      deletedAt: null,
-    });
+    const [student, course, existing] = await Promise.all([
+      User.findOne({
+        _id: studentId,
+        role: "student",
+        deletedAt: null,
+      }),
+      Course.findOne({ _id: courseId, deletedAt: null, isActive: true }),
+      Enrollment.findOne({ student: studentId, course: courseId }),
+    ]);
+
     if (!student) return errorResponse("الطالب غير موجود", 404);
-
-    const course = await Course.findOne({ _id: courseId, deletedAt: null, isActive: true });
     if (!course) return errorResponse("الدورة غير موجودة", 404);
+    if (existing) return errorResponse("الطالب مسجل مسبقا في هذه الدورة", 409);
 
-    const existing = await Enrollment.findOne({ student: studentId, course: courseId });
-    if (existing) return errorResponse("الطالب مسجل مسبقاً في هذه الدورة", 409);
-
-    await onEnrollmentCreated(courseId, statusInput);
+    try {
+      await onEnrollmentCreated(courseId, statusInput);
+    } catch (err) {
+      return errorResponse(
+        err instanceof Error ? err.message : "تعذر إنشاء التسجيل",
+        400
+      );
+    }
 
     const enrollment = await Enrollment.create({
       student: studentId,
       course: courseId,
       status: statusInput,
-      note: body.note?.trim() || "",
+      note: typeof body.note === "string" ? body.note.trim() : "",
       createdBy: user!._id,
     });
 
     const populated = await Enrollment.findById(enrollment._id)
       .populate("student", "name phone")
       .populate({ path: "course", populate: { path: "teacher", select: "name" } })
+      .populate("createdBy", "name role")
       .lean();
 
     return successResponse({ enrollment: formatEnrollment(populated!) }, 201);
   } catch (err) {
-    const message = err instanceof Error ? err.message : "حدث خطأ";
-    console.error("Admin enrollments POST:", err);
-    return errorResponse(message, 500);
+    return handleRouteError("Admin enrollments POST", err);
   }
 }

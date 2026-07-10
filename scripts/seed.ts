@@ -63,19 +63,20 @@ async function seed() {
       ? { email: account.email }
       : { phone: account.phone };
 
-    await User.findOneAndUpdate(
-      filter,
-      {
-        ...account,
-        password: hashedPassword,
-        isActive: true,
-      },
-      { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
-    );
-    console.log(`Staff account ready: ${account.name} (${account.role})`);
+    const existingUser = await User.findOne(filter);
+    if (existingUser) {
+      console.log(`Staff account already exists: ${account.name} (${account.role})`);
+      continue;
+    }
+
+    await User.create({
+      ...account,
+      password: hashedPassword,
+      isActive: true,
+    });
+    console.log(`Staff account created: ${account.name} (${account.role})`);
   }
 
-  await User.deleteMany({ role: "student" });
   await Teacher.deleteMany({});
   await Course.deleteMany({});
 
@@ -177,7 +178,7 @@ async function seed() {
   console.log(`Created ${courses.length} courses`);
 
   console.log("\nSeed completed successfully!");
-  console.log("Staff accounts created/updated (admin, deputy, secretary)");
+  console.log("Staff accounts checked (admin, deputy, secretary)");
 
   await mongoose.disconnect();
 }

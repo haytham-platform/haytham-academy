@@ -1,4 +1,4 @@
-import type { EnrollmentStatus, StudentGender } from "@/types";
+import type { EnrollmentStatus, StudentGender, StudentStatus } from "@/types";
 
 export function notDeletedFilter(includeDeleted?: boolean) {
   if (includeDeleted) return {};
@@ -11,6 +11,7 @@ export function formatStudent(s: {
   phone?: string;
   role: string;
   isActive: boolean;
+  status?: StudentStatus;
   gender?: StudentGender;
   dateOfBirth?: Date;
   guardianName?: string;
@@ -31,6 +32,7 @@ export function formatStudent(s: {
     phone: s.phone,
     role: s.role,
     isActive: s.isActive,
+    status: s.status ?? (s.isActive ? "active" : "inactive"),
     gender: s.gender,
     dateOfBirth: s.dateOfBirth,
     guardianName: s.guardianName,
@@ -137,6 +139,7 @@ export function formatEnrollment(e: {
   note?: string;
   createdBy?: unknown;
   createdAt: Date;
+  updatedAt?: Date;
 }) {
   return {
     _id: e._id.toString(),
@@ -146,6 +149,7 @@ export function formatEnrollment(e: {
     note: e.note ?? "",
     createdBy: e.createdBy,
     createdAt: e.createdAt,
+    updatedAt: e.updatedAt,
   };
 }
 

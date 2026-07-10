@@ -17,7 +17,7 @@ export async function POST(
 
     const student = await User.findOneAndUpdate(
       { _id: id, role: "student" },
-      { deletedAt: null, isActive: true },
+      { deletedAt: null, isActive: true, status: "active" },
       { new: true }
     ).select("-password");
 

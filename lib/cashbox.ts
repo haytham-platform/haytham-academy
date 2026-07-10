@@ -1,12 +1,16 @@
 import mongoose from "mongoose";
 import { connectDB } from "@/lib/db";
 import Cashbox from "@/models/Cashbox";
+import DailyCashClosure from "@/models/DailyCashClosure";
 import CashLedger, {
   type LedgerDirection,
   type LedgerSourceType,
+  type LedgerStatus,
   type LedgerType,
 } from "@/models/CashLedger";
 import { getPeriodRange, validateAmount } from "@/lib/finance";
+import { notifyFinance } from "@/lib/notifications";
+import { recordFinancialAudit } from "@/lib/audit";
 
 interface LedgerParams {
   type: LedgerType;
@@ -14,7 +18,14 @@ interface LedgerParams {
   direction: LedgerDirection;
   sourceType: LedgerSourceType;
   sourceId?: string;
+  category?: string;
   description: string;
+  studentId?: string;
+  teacherId?: string;
+  courseId?: string;
+  paymentMethod?: string;
+  status?: LedgerStatus;
+  notes?: string;
   createdBy: string;
 }
 
@@ -48,7 +59,7 @@ export async function recordLedgerEntry(params: LedgerParams) {
       $set: { updatedBy },
       $setOnInsert: { openingBalance: 0, currency: "DZD" },
     },
-    { upsert: true, new: false, setDefaultsOnInsert: true }
+    { upsert: true, returnDocument: "before", setDefaultsOnInsert: true }
   );
 
   const balanceBefore = cashbox?.currentBalance ?? 0;
@@ -61,7 +72,14 @@ export async function recordLedgerEntry(params: LedgerParams) {
       direction: params.direction,
       sourceType: params.sourceType,
       sourceId: params.sourceId || undefined,
+      category: params.category,
       description: params.description,
+      studentId: params.studentId || undefined,
+      teacherId: params.teacherId || undefined,
+      courseId: params.courseId || undefined,
+      paymentMethod: params.paymentMethod,
+      status: params.status ?? "posted",
+      notes: params.notes,
       balanceBefore,
       balanceAfter,
       createdBy: params.createdBy,
@@ -98,6 +116,7 @@ export async function reverseSourceEntry(
     sourceId,
     description,
     createdBy,
+    status: "reversed",
   });
 }
 
@@ -105,7 +124,8 @@ export async function recordPaymentIn(
   paymentId: string,
   amount: number,
   description: string,
-  createdBy: string
+  createdBy: string,
+  metadata: Partial<Pick<LedgerParams, "studentId" | "courseId" | "paymentMethod" | "notes">> = {}
 ) {
   return recordLedgerEntry({
     type: "income",
@@ -113,8 +133,10 @@ export async function recordPaymentIn(
     direction: "in",
     sourceType: "payment",
     sourceId: paymentId,
+    category: "student_payment",
     description,
     createdBy,
+    ...metadata,
   });
 }
 
@@ -122,7 +144,8 @@ export async function recordExpenseOut(
   expenseId: string,
   amount: number,
   description: string,
-  createdBy: string
+  createdBy: string,
+  metadata: Partial<Pick<LedgerParams, "category" | "notes">> = {}
 ) {
   return recordLedgerEntry({
     type: "expense",
@@ -130,8 +153,10 @@ export async function recordExpenseOut(
     direction: "out",
     sourceType: "expense",
     sourceId: expenseId,
+    category: metadata.category ?? "expense",
     description,
     createdBy,
+    notes: metadata.notes,
   });
 }
 
@@ -139,7 +164,8 @@ export async function recordPayoutOut(
   payoutId: string,
   amount: number,
   description: string,
-  createdBy: string
+  createdBy: string,
+  metadata: Partial<Pick<LedgerParams, "teacherId" | "courseId" | "notes">> = {}
 ) {
   return recordLedgerEntry({
     type: "teacher_payout",
@@ -147,8 +173,10 @@ export async function recordPayoutOut(
     direction: "out",
     sourceType: "teacher_payout",
     sourceId: payoutId,
+    category: "teacher_salary",
     description,
     createdBy,
+    ...metadata,
   });
 }
 
@@ -163,6 +191,7 @@ export async function recordManualAdjustment(
     amount,
     direction,
     sourceType: "manual_adjustment",
+    category: "manual_adjustment",
     description: reason,
     createdBy,
   });
@@ -175,7 +204,14 @@ export function formatLedgerEntry(entry: {
   direction: string;
   sourceType: string;
   sourceId?: { toString(): string };
+  category?: string;
   description: string;
+  studentId?: { toString(): string };
+  teacherId?: { toString(): string };
+  courseId?: { toString(): string };
+  paymentMethod?: string;
+  status?: string;
+  notes?: string;
   balanceBefore: number;
   balanceAfter: number;
   createdBy: { toString(): string } | string;
@@ -188,14 +224,21 @@ export function formatLedgerEntry(entry: {
     direction: entry.direction,
     sourceType: entry.sourceType,
     sourceId: entry.sourceId?.toString?.(),
+    category: entry.category,
     description: entry.description,
+    studentId: entry.studentId?.toString?.(),
+    teacherId: entry.teacherId?.toString?.(),
+    courseId: entry.courseId?.toString?.(),
+    paymentMethod: entry.paymentMethod,
+    status: entry.status ?? "posted",
+    notes: entry.notes,
     balanceBefore: entry.balanceBefore,
     balanceAfter: entry.balanceAfter,
     createdBy:
       typeof entry.createdBy === "string"
         ? entry.createdBy
         : entry.createdBy.toString(),
-    createdAt: entry.createdAt,
+    createdAt: toIso(entry.createdAt),
   };
 }
 
@@ -223,6 +266,9 @@ export async function getCashboxOverview() {
 
   const openingToday = cashbox.currentBalance - todayIn + todayOut;
   const netToday = todayIn - todayOut;
+  const latestClosure = await DailyCashClosure.findOne({ dateKey: dateKey() })
+    .sort({ updatedAt: -1 })
+    .lean();
 
   return {
     openingBalance: cashbox.openingBalance,
@@ -232,7 +278,20 @@ export async function getCashboxOverview() {
     todayIn,
     todayOut,
     netToday,
-    updatedAt: cashbox.updatedAt,
+    expectedCashToday: openingToday + netToday,
+    closure: latestClosure
+      ? {
+          _id: latestClosure._id.toString(),
+          actualCash: latestClosure.actualCash,
+          expectedCash: latestClosure.expectedCash,
+          difference: latestClosure.difference,
+          status: latestClosure.status,
+          approvalStatus: latestClosure.approvalStatus,
+          note: latestClosure.note ?? "",
+          updatedAt: toIso(latestClosure.updatedAt),
+        }
+      : null,
+    updatedAt: toIso(cashbox.updatedAt),
   };
 }
 
@@ -266,4 +325,122 @@ export async function getCashLedger(filters: {
   return entries.map((e) =>
     formatLedgerEntry(e as Parameters<typeof formatLedgerEntry>[0])
   );
+}
+
+export function dateKey(date = new Date()) {
+  return date.toISOString().slice(0, 10);
+}
+
+export function cashDifferenceStatus(difference: number) {
+  if (difference === 0) return "balanced";
+  return difference < 0 ? "shortage" : "overage";
+}
+
+export async function closeDailyCash(params: {
+  actualCash: number;
+  note?: string;
+  enteredBy: string;
+}) {
+  const actualCash = Number(params.actualCash);
+  if (!Number.isFinite(actualCash) || actualCash < 0) {
+    throw new Error("المبلغ الفعلي غير صالح");
+  }
+
+  const overview = await getCashboxOverview();
+  const expectedCash = overview.expectedCashToday;
+  const difference = actualCash - expectedCash;
+  const status = cashDifferenceStatus(difference);
+
+  const closure = await DailyCashClosure.findOneAndUpdate(
+    { dateKey: dateKey() },
+    {
+      expectedCash,
+      actualCash,
+      difference,
+      status,
+      approvalStatus: "pending",
+      note: params.note?.trim() || "",
+      enteredBy: params.enteredBy,
+    },
+    { upsert: true, returnDocument: "after", setDefaultsOnInsert: true }
+  );
+
+  await notifyFinance({
+    title: "تم إغلاق الصندوق اليومي",
+    message: `تم إدخال النقد الفعلي: ${actualCash}. الفرق: ${difference}.`,
+    type: status === "balanced" ? "success" : "warning",
+    createdBy: params.enteredBy,
+    data: {
+      expectedCash,
+      actualCash,
+      difference,
+      status,
+      closureId: closure._id.toString(),
+    },
+  });
+
+  if (difference !== 0) {
+    await notifyFinance({
+      title: "فرق في الصندوق",
+      message: `النقد الفعلي لا يطابق المتوقع. الفرق: ${difference}.`,
+      type: "warning",
+      createdBy: params.enteredBy,
+      data: {
+        expectedCash,
+        actualCash,
+        difference,
+        status,
+        closureId: closure._id.toString(),
+      },
+    });
+  }
+
+  await recordFinancialAudit({
+    userId: params.enteredBy,
+    action: "cashbox.close",
+    recordType: "daily_cash_closure",
+    recordId: closure._id.toString(),
+    metadata: {
+      expectedCash,
+      actualCash,
+      difference,
+      status,
+    },
+  });
+
+  return closure;
+}
+
+export async function reviewDailyCashClosure(params: {
+  closureId: string;
+  approvalStatus: "approved" | "rejected";
+  reviewedBy: string;
+}) {
+  const closure = await DailyCashClosure.findByIdAndUpdate(
+    params.closureId,
+    {
+      approvalStatus: params.approvalStatus,
+      reviewedBy: params.reviewedBy,
+      reviewedAt: new Date(),
+    },
+    { returnDocument: "after" }
+  );
+  if (!closure) throw new Error("إغلاق الصندوق غير موجود");
+  await recordFinancialAudit({
+    userId: params.reviewedBy,
+    action: "cashbox.review",
+    recordType: "daily_cash_closure",
+    recordId: params.closureId,
+    metadata: {
+      approvalStatus: params.approvalStatus,
+    },
+  });
+  return closure;
+}
+
+function toIso(value: Date | string | undefined | null) {
+  if (!value) return "";
+  if (value instanceof Date) return value.toISOString();
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? "" : date.toISOString();
 }

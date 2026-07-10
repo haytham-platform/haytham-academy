@@ -8,6 +8,7 @@ import {
   UserPlus,
   Armchair,
   TrendingUp,
+  Clock,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { isStaffRole } from "@/lib/permissions";
@@ -47,6 +48,7 @@ export default async function AdminDashboardPage() {
     totalStudents,
     newStudentsThisMonth,
     activeStudents,
+    pendingStudents,
     teachersCount,
     coursesCount,
     activeCourses,
@@ -61,6 +63,7 @@ export default async function AdminDashboardPage() {
     User.countDocuments(studentBase),
     User.countDocuments({ ...studentBase, createdAt: { $gte: monthStart } }),
     User.countDocuments({ ...studentBase, isActive: true }),
+    User.countDocuments({ ...studentBase, status: "pending" }),
     Teacher.countDocuments({ deletedAt: null }),
     Course.countDocuments({ deletedAt: null }),
     Course.countDocuments(activeCourseFilter),
@@ -133,6 +136,7 @@ export default async function AdminDashboardPage() {
     { label: "إجمالي الطلاب", value: totalStudents, icon: Users, color: "bg-blue-500" },
     { label: "طلاب جدد (الشهر)", value: newStudentsThisMonth, icon: UserPlus, color: "bg-cyan-500" },
     { label: "الطلاب النشطون", value: activeStudents, icon: TrendingUp, color: "bg-emerald-500" },
+    { label: "طلاب قيد الانتظار", value: pendingStudents, icon: Clock, color: "bg-amber-500" },
     { label: "إجمالي الأساتذة", value: teachersCount, icon: GraduationCap, color: "bg-sky-500" },
     { label: "إجمالي الدورات", value: coursesCount, icon: BookOpen, color: "bg-indigo-500" },
     { label: "الدورات النشطة", value: activeCourses, icon: BookOpen, color: "bg-violet-500" },

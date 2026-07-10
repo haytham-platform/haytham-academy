@@ -1,13 +1,15 @@
 import { connectDB } from "@/lib/db";
 import Payment from "@/models/Payment";
 import User from "@/models/User";
-import { requireFinance } from "@/lib/auth-helpers";
+import { requireFinancePayment } from "@/lib/auth-helpers";
 import {
   formatPayment,
   validateAmount,
   validateDate,
 } from "@/lib/finance";
 import { recordPaymentIn } from "@/lib/cashbox";
+import { notifyFinance } from "@/lib/notifications";
+import { recordFinancialAudit } from "@/lib/audit";
 import { successResponse, errorResponse } from "@/lib/api-response";
 
 function buildPaymentFilter(searchParams: URLSearchParams) {
@@ -36,7 +38,7 @@ function buildPaymentFilter(searchParams: URLSearchParams) {
 
 export async function GET(request: Request) {
   try {
-    const { error } = await requireFinance();
+    const { error } = await requireFinancePayment();
     if (error) return error;
 
     await connectDB();
@@ -72,7 +74,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { user, error } = await requireFinance();
+    const { user, error } = await requireFinancePayment();
     if (error) return error;
 
     const body = await request.json();
@@ -109,8 +111,43 @@ export async function POST(request: Request) {
       payment._id.toString(),
       amount,
       `دفعة طالب — ${body.note?.trim() || "بدون ملاحظة"}`,
-      user!._id
+      user!._id,
+      {
+        studentId: String(body.studentId),
+        courseId: String(body.courseId),
+        paymentMethod: body.paymentMethod,
+        notes: body.note?.trim() || "",
+      }
     );
+
+    await notifyFinance({
+      title: "دفعة طالب جديدة",
+      message: `تم تسجيل دخل جديد بقيمة ${amount}`,
+      type: "success",
+      createdBy: user!._id,
+      data: {
+        paymentId: payment._id.toString(),
+        studentId: body.studentId,
+        courseId: body.courseId,
+        amount,
+        recordedBy: user!.name,
+        time: new Date().toISOString(),
+      },
+    });
+
+    await recordFinancialAudit({
+      userId: user!._id,
+      action: "payment.create",
+      recordType: "payment",
+      recordId: payment._id.toString(),
+      metadata: {
+        receiptNumber: payment.receiptNumber,
+        amount,
+        studentId: body.studentId,
+        courseId: body.courseId,
+        paymentMethod: body.paymentMethod,
+      },
+    });
 
     const populated = await Payment.findById(payment._id)
       .populate("studentId", "name phone")

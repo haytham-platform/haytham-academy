@@ -34,27 +34,34 @@ export async function middleware(request: NextRequest) {
 
   const isAdminPage = pathname.startsWith("/admin");
   const isStudentPage = pathname.startsWith("/student");
+  const isTeacherPage = pathname.startsWith("/teacher");
   const isAdminApi = pathname.startsWith("/api/admin");
+  const isTeacherApi = pathname.startsWith("/api/teacher");
   const isStudentApi =
     pathname.startsWith("/api/enrollments") &&
     !pathname.startsWith("/api/enrollments/public");
 
   const isProtected =
-    isAdminPage || isStudentPage || isAdminApi || isStudentApi;
+    isAdminPage ||
+    isStudentPage ||
+    isTeacherPage ||
+    isAdminApi ||
+    isStudentApi ||
+    isTeacherApi;
 
   if (!isProtected) {
     return NextResponse.next();
   }
 
   if (!token) {
-    if (isAdminApi || isStudentApi) return unauthorizedApi();
+    if (isAdminApi || isStudentApi || isTeacherApi) return unauthorizedApi();
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
   const session = await validateSessionFromRequest(request);
 
   if (!session) {
-    if (isAdminApi || isStudentApi) return unauthorizedApi();
+    if (isAdminApi || isStudentApi || isTeacherApi) return unauthorizedApi();
     const response = NextResponse.redirect(new URL("/login", request.url));
     response.cookies.set(JWT_COOKIE_NAME, "", { path: "/", maxAge: 0 });
     return response;
@@ -82,6 +89,13 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
+  if ((isTeacherPage || isTeacherApi) && role !== "teacher") {
+    if (isTeacherApi) {
+      return NextResponse.json({ error: "ليس لديك صلاحية" }, { status: 403 });
+    }
+    return NextResponse.redirect(new URL("/", request.url));
+  }
+
   return NextResponse.next();
 }
 
@@ -89,7 +103,9 @@ export const config = {
   matcher: [
     "/admin/:path*",
     "/student/:path*",
+    "/teacher/:path*",
     "/api/admin/:path*",
+    "/api/teacher/:path*",
     "/api/enrollments",
     "/api/enrollments/:path*",
   ],

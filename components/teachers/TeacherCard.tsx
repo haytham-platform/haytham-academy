@@ -2,14 +2,10 @@ import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
+import type { TeacherCardData } from "@/types/ui";
 
 interface TeacherCardProps {
-  teacher: {
-    _id: string;
-    name: string;
-    subject: string;
-    teachingLevel: string;
-  };
+  teacher: TeacherCardData;
 }
 
 export default function TeacherCard({ teacher }: TeacherCardProps) {

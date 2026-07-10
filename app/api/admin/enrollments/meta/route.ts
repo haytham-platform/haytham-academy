@@ -17,7 +17,7 @@ export async function GET() {
         .sort({ name: 1 })
         .lean(),
       Course.find({ deletedAt: null, isActive: true })
-        .select("title remainingSeats seats")
+        .select("title level remainingSeats seats")
         .sort({ title: 1 })
         .lean(),
     ]);
@@ -31,6 +31,7 @@ export async function GET() {
       courses: courses.map((c) => ({
         _id: c._id.toString(),
         title: c.title,
+        level: c.level,
         remainingSeats: c.remainingSeats ?? c.seats,
         seats: c.seats,
       })),

@@ -3,7 +3,7 @@ import mongoose from "mongoose";
 import LessonInvoice from "@/models/LessonInvoice";
 import User from "@/models/User";
 import Teacher from "@/models/Teacher";
-import { requireFinance } from "@/lib/auth-helpers";
+import { requireFinancePayment } from "@/lib/auth-helpers";
 import { validateDate } from "@/lib/finance";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { handleRouteError } from "@/lib/api-errors";
@@ -55,7 +55,7 @@ function buildFilter(searchParams: URLSearchParams) {
 
 export async function GET(request: Request) {
   try {
-    const { error } = await requireFinance();
+    const { error } = await requireFinancePayment();
     if (error) return error;
 
     await connectDB();
@@ -92,7 +92,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { user, error } = await requireFinance();
+    const { user, error } = await requireFinancePayment();
     if (error) return error;
 
     const body = await request.json();

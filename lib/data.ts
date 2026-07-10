@@ -2,8 +2,35 @@ import { connectDB } from "@/lib/db";
 import Course from "@/models/Course";
 import Teacher from "@/models/Teacher";
 import Enrollment from "@/models/Enrollment";
+import type { CourseCardData, TeacherCardData } from "@/types/ui";
 
-export async function getActiveCourses(limit?: number) {
+type StringableId = { toString(): string };
+
+type PopulatedTeacher = {
+  _id?: StringableId | string;
+  name?: string;
+  subject?: string;
+} | null;
+
+function idToString(value: StringableId | string | undefined | null): string {
+  return value ? value.toString() : "";
+}
+
+function dateToIso(value: Date | string | undefined | null): string {
+  if (!value) return "";
+  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+}
+
+function teacherRefToPlain(teacher: PopulatedTeacher): CourseCardData["teacher"] {
+  if (!teacher || typeof teacher !== "object") return null;
+  return {
+    _id: idToString(teacher._id),
+    name: teacher.name ?? "",
+    subject: teacher.subject ?? "",
+  };
+}
+
+export async function getActiveCourses(limit?: number): Promise<CourseCardData[]> {
   await connectDB();
   let query = Course.find({ isActive: true })
     .populate("teacher", "name subject")
@@ -22,13 +49,13 @@ export async function getActiveCourses(limit?: number) {
     image: c.image,
     level: c.level,
     duration: c.duration,
-    startDate: c.startDate,
+    startDate: dateToIso(c.startDate),
     seats: c.seats,
-    teacher: c.teacher as { name?: string; subject?: string } | null,
+    teacher: teacherRefToPlain(c.teacher as PopulatedTeacher),
   }));
 }
 
-export async function getActiveTeachers(limit?: number) {
+export async function getActiveTeachers(limit?: number): Promise<TeacherCardData[]> {
   await connectDB();
   let query = Teacher.find({ isActive: true }).sort({ createdAt: -1 });
 
@@ -55,7 +82,7 @@ export async function getStudentEnrollments(studentId: string) {
   return enrollments.map((e) => ({
     _id: e._id.toString(),
     status: e.status,
-    createdAt: e.createdAt,
+    createdAt: dateToIso(e.createdAt),
     course: e.course as {
       title?: string;
       level?: string;

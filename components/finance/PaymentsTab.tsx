@@ -16,6 +16,7 @@ import {
 
 interface Payment {
   _id: string;
+  receiptNumber?: string;
   studentId: string;
   studentName?: string;
   studentPhone?: string;

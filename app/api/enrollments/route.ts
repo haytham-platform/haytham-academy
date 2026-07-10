@@ -1,8 +1,10 @@
+import mongoose from "mongoose";
 import { connectDB } from "@/lib/db";
 import Enrollment from "@/models/Enrollment";
 import Course from "@/models/Course";
 import { getCurrentUser } from "@/lib/auth";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import { handleRouteError } from "@/lib/api-errors";
 import { onEnrollmentCreated } from "@/lib/enrollment-service";
 
 export async function POST(request: Request) {
@@ -10,7 +12,7 @@ export async function POST(request: Request) {
     const user = await getCurrentUser();
 
     if (!user) {
-      return errorResponse("يجب تسجيل الدخول أولاً", 401);
+      return errorResponse("يجب تسجيل الدخول أولا", 401);
     }
 
     if (user.role !== "student") {
@@ -18,10 +20,13 @@ export async function POST(request: Request) {
     }
 
     const body = await request.json();
-    const { courseId } = body;
+    const courseId = typeof body.courseId === "string" ? body.courseId.trim() : "";
 
     if (!courseId) {
       return errorResponse("معرف الدورة مطلوب");
+    }
+    if (!mongoose.Types.ObjectId.isValid(courseId)) {
+      return errorResponse("معرف الدورة غير صالح");
     }
 
     await connectDB();
@@ -37,7 +42,7 @@ export async function POST(request: Request) {
     });
 
     if (existing) {
-      return errorResponse("أنت مسجل مسبقاً في هذه الدورة", 409);
+      return errorResponse("أنت مسجل مسبقا في هذه الدورة", 409);
     }
 
     try {
@@ -53,6 +58,7 @@ export async function POST(request: Request) {
       student: user._id,
       course: courseId,
       status: "pending",
+      createdBy: user._id,
     });
 
     return successResponse(
@@ -66,8 +72,7 @@ export async function POST(request: Request) {
       201
     );
   } catch (error) {
-    console.error("Enrollment POST error:", error);
-    return errorResponse("حدث خطأ أثناء التسجيل في الدورة", 500);
+    return handleRouteError("Enrollment POST", error);
   }
 }
 
@@ -94,13 +99,12 @@ export async function GET() {
       _id: e._id.toString(),
       student: e.student,
       course: e.course,
-      status: e.status,
+      status: String(e.status) === "accepted" ? "approved" : e.status,
       createdAt: e.createdAt,
     }));
 
     return successResponse({ enrollments: formatted });
   } catch (error) {
-    console.error("Enrollment GET error:", error);
-    return errorResponse("حدث خطأ", 500);
+    return handleRouteError("Enrollment GET", error);
   }
 }

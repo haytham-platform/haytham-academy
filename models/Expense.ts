@@ -10,6 +10,7 @@ export type ExpenseCategory =
   | "other";
 
 export interface IExpense extends Document {
+  expenseNumber: string;
   title: string;
   amount: number;
   category: ExpenseCategory;
@@ -23,6 +24,7 @@ export interface IExpense extends Document {
 const ExpenseSchema = new Schema<IExpense>(
   {
     title: { type: String, required: true, trim: true },
+    expenseNumber: { type: String, required: true, unique: true, trim: true },
     amount: { type: Number, required: true, min: 0.01 },
     category: {
       type: String,
@@ -43,6 +45,20 @@ const ExpenseSchema = new Schema<IExpense>(
   },
   { timestamps: true }
 );
+
+ExpenseSchema.pre("validate", async function () {
+  if (this.expenseNumber) return;
+  const date = this.expenseDate ?? new Date();
+  const datePart = date.toISOString().slice(0, 10).replace(/-/g, "");
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+  const count = await Expense.countDocuments({
+    expenseDate: { $gte: start, $lte: end },
+  });
+  this.expenseNumber = `EXP-${datePart}-${String(count + 1).padStart(4, "0")}`;
+});
 
 ExpenseSchema.index({ expenseDate: -1 });
 ExpenseSchema.index({ category: 1 });

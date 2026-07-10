@@ -1,7 +1,7 @@
 import { connectDB } from "@/lib/db";
 import mongoose from "mongoose";
 import Teacher from "@/models/Teacher";
-import { requireFinance } from "@/lib/auth-helpers";
+import { requireFinancePayout } from "@/lib/auth-helpers";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import {
   computeTeacherAccount,
@@ -12,7 +12,7 @@ import {
 
 export async function GET(request: Request) {
   try {
-    const { error } = await requireFinance();
+    const { error } = await requireFinancePayout();
     if (error) return error;
 
     const { searchParams } = new URL(request.url);

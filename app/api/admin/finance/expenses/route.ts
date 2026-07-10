@@ -1,12 +1,14 @@
 import { connectDB } from "@/lib/db";
 import Expense from "@/models/Expense";
-import { requireFinance } from "@/lib/auth-helpers";
+import { requireFinanceExpense } from "@/lib/auth-helpers";
 import {
   formatExpense,
   validateAmount,
   validateDate,
 } from "@/lib/finance";
 import { recordExpenseOut } from "@/lib/cashbox";
+import { notifyFinance } from "@/lib/notifications";
+import { recordFinancialAudit } from "@/lib/audit";
 import { successResponse, errorResponse } from "@/lib/api-response";
 
 const CATEGORIES = [
@@ -21,7 +23,7 @@ const CATEGORIES = [
 
 export async function GET(request: Request) {
   try {
-    const { error } = await requireFinance();
+    const { error } = await requireFinanceExpense();
     if (error) return error;
 
     await connectDB();
@@ -56,7 +58,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { user, error } = await requireFinance();
+    const { user, error } = await requireFinanceExpense();
     if (error) return error;
 
     const body = await request.json();
@@ -85,8 +87,36 @@ export async function POST(request: Request) {
       expense._id.toString(),
       amount,
       `مصروف: ${body.title.trim()}`,
-      user!._id
+      user!._id,
+      { category: body.category, notes: body.note?.trim() || "" }
     );
+
+    await notifyFinance({
+      title: amount >= 50000 ? "مصروف كبير جديد" : "مصروف جديد",
+      message: `تم تسجيل مصروف: ${body.title.trim()} - ${amount}`,
+      type: "warning",
+      createdBy: user!._id,
+      data: {
+        expenseId: expense._id.toString(),
+        title: body.title.trim(),
+        category: body.category,
+        amount,
+        recordedBy: user!.name,
+        time: new Date().toISOString(),
+      },
+    });
+
+    await recordFinancialAudit({
+      userId: user!._id,
+      action: "expense.create",
+      recordType: "expense",
+      recordId: expense._id.toString(),
+      metadata: {
+        expenseNumber: expense.expenseNumber,
+        amount,
+        category: body.category,
+      },
+    });
 
     return successResponse(
       { expense: formatExpense(expense.toObject()) },

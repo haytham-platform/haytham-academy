@@ -1,5 +1,5 @@
 import mongoose, { Schema, type Document, type Model } from "mongoose";
-import type { StudentGender, UserRole } from "@/types";
+import type { StudentGender, StudentStatus, UserRole } from "@/types";
 
 export interface IUser extends Document {
   name: string;
@@ -8,6 +8,7 @@ export interface IUser extends Document {
   password: string;
   role: UserRole;
   isActive: boolean;
+  status: StudentStatus;
   gender?: StudentGender;
   dateOfBirth?: Date;
   guardianName?: string;
@@ -41,6 +42,11 @@ const UserSchema = new Schema<IUser>(
       default: "student",
     },
     isActive: { type: Boolean, default: true },
+    status: {
+      type: String,
+      enum: ["active", "inactive", "pending"],
+      default: "active",
+    },
     gender: { type: String, enum: ["male", "female"] },
     dateOfBirth: { type: Date },
     guardianName: { type: String, trim: true },
@@ -57,6 +63,7 @@ const UserSchema = new Schema<IUser>(
 );
 
 UserSchema.index({ role: 1, deletedAt: 1, createdAt: -1 });
+UserSchema.index({ role: 1, status: 1, deletedAt: 1 });
 UserSchema.index({ name: "text", phone: "text", email: "text" });
 
 UserSchema.pre("validate", function () {

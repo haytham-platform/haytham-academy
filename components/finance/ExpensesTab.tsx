@@ -15,6 +15,7 @@ import {
 
 interface Expense {
   _id: string;
+  expenseNumber?: string;
   title: string;
   amount: number;
   category: string;

@@ -14,6 +14,8 @@ interface Report {
   totalExpenses: number;
   paidTeacherPayouts: number;
   pendingTeacherPayouts: number;
+  outstandingStudentBalances: number;
+  outstandingTeacherBalances: number;
   netProfit: number;
   operationCount: number;
   paymentCount: number;
@@ -138,6 +140,14 @@ export default function ReportsTab() {
             <div>
               <p className="text-sm text-muted">مستحقات معلقة</p>
               <p className="text-xl font-bold text-amber-600">{formatCurrency(report.pendingTeacherPayouts)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted">أرصدة طلاب مستحقة</p>
+              <p className="text-xl font-bold text-amber-600">{formatCurrency(report.outstandingStudentBalances)}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted">أرصدة أساتذة مستحقة</p>
+              <p className="text-xl font-bold text-amber-600">{formatCurrency(report.outstandingTeacherBalances)}</p>
             </div>
             <div>
               <p className="text-sm text-muted">صافي الربح</p>

@@ -1,7 +1,11 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { cookies } from "next/headers";
-import { JWT_COOKIE_NAME, JWT_EXPIRES_IN } from "@/lib/constants";
+import {
+  JWT_COOKIE_NAME,
+  JWT_EXPIRES_IN,
+  SESSION_MAX_AGE_SECONDS,
+} from "@/lib/constants";
 import { validateSession } from "@/lib/session";
 import type { JwtPayload, UserRole, SafeUser } from "@/types";
 
@@ -39,7 +43,7 @@ export function verifyToken(token: string): JwtPayload | null {
   }
 }
 
-export function getTokenCookieOptions(maxAge = 60 * 60 * 24 * 7) {
+export function getTokenCookieOptions(maxAge = SESSION_MAX_AGE_SECONDS) {
   return {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",

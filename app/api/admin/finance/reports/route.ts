@@ -1,10 +1,10 @@
-import { requireFinance } from "@/lib/auth-helpers";
+import { requireFinanceReports } from "@/lib/auth-helpers";
 import { computeReport } from "@/lib/finance";
 import { successResponse, errorResponse } from "@/lib/api-response";
 
 export async function GET(request: Request) {
   try {
-    const { error } = await requireFinance();
+    const { error } = await requireFinanceReports();
     if (error) return error;
 
     const { searchParams } = new URL(request.url);

@@ -15,6 +15,30 @@ export interface MockCourse {
   };
 }
 
+export interface CourseCardData {
+  _id: string;
+  title: string;
+  description: string;
+  price: number;
+  image: string;
+  level: string;
+  duration: string;
+  startDate: string;
+  seats: number;
+  teacher: {
+    _id: string;
+    name: string;
+    subject: string;
+  } | null;
+}
+
+export interface TeacherCardData {
+  _id: string;
+  name: string;
+  subject: string;
+  teachingLevel: string;
+}
+
 export interface MockTeacher {
   _id: string;
   name: string;

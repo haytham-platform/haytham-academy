@@ -8,5 +8,6 @@ export const ACADEMY: AcademyInfo = {
 };
 
 export const JWT_COOKIE_NAME = "haytham_token";
-export const JWT_EXPIRES_IN = "7d";
-export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
+export const AUTH_SESSION_DAYS = 30;
+export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * AUTH_SESSION_DAYS;
+export const JWT_EXPIRES_IN = `${AUTH_SESSION_DAYS}d`;

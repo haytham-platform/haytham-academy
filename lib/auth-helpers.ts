@@ -34,7 +34,44 @@ export async function requireAdmin() {
 }
 
 export async function requireFinance() {
+  return requirePermission("finance.view");
+}
+
+export async function requireFinancePayment() {
+  return requirePermission("finance.payments");
+}
+
+export async function requireFinanceExpense() {
+  return requirePermission("finance.expenses");
+}
+
+export async function requireFinancePayout() {
+  return requirePermission("finance.payouts");
+}
+
+export async function requireFinanceCash() {
+  return requirePermission("finance.cash");
+}
+
+export async function requireFinanceReports() {
+  return requirePermission("finance.reports");
+}
+
+export async function requireFinanceManager() {
   return requirePermission("finance.manage");
+}
+
+export async function requireFinanceOwner() {
+  return requirePermission("finance.owner");
+}
+
+export async function requireFinanceDelete() {
+  const { user, error } = await requireAuth();
+  if (error) return { user: null, error };
+  if (user!.role !== "admin" && user!.role !== "deputy") {
+    return { user: null, error: errorResponse("الحذف المالي متاح للمدير والنائب فقط", 403) };
+  }
+  return { user, error: null };
 }
 
 export async function requireTransportView() {

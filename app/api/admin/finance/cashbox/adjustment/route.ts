@@ -1,12 +1,13 @@
-import { requireFinance } from "@/lib/auth-helpers";
+import { requireFinanceManager } from "@/lib/auth-helpers";
 import { recordManualAdjustment, getCashboxOverview } from "@/lib/cashbox";
 import { validateAmount } from "@/lib/finance";
+import { recordFinancialAudit } from "@/lib/audit";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import type { LedgerDirection } from "@/models/CashLedger";
 
 export async function POST(request: Request) {
   try {
-    const { user, error } = await requireFinance();
+    const { user, error } = await requireFinanceManager();
     if (error) return error;
 
     const body = await request.json();
@@ -20,7 +21,14 @@ export async function POST(request: Request) {
     }
     if (!reason) return errorResponse("سبب التعديل مطلوب");
 
-    await recordManualAdjustment(amount, direction, reason, user!._id);
+    const { entry } = await recordManualAdjustment(amount, direction, reason, user!._id);
+    await recordFinancialAudit({
+      userId: user!._id,
+      action: "cashbox.adjustment",
+      recordType: "cash_ledger",
+      recordId: entry._id.toString(),
+      metadata: { amount, direction, reason },
+    });
 
     const cashbox = await getCashboxOverview();
     return successResponse({

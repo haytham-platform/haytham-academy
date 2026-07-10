@@ -8,18 +8,10 @@ import { formatPrice } from "@/lib/utils";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import type { CourseCardData } from "@/types/ui";
 
 interface CourseCardProps {
-  course: {
-    _id: string;
-    title: string;
-    description: string;
-    price: number;
-    image: string;
-    level: string;
-    duration: string;
-    teacher?: { name?: string; subject?: string } | null;
-  };
+  course: CourseCardData;
   showEnroll?: boolean;
 }
 

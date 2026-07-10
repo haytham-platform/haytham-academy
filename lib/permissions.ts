@@ -13,6 +13,13 @@ export type Permission =
   | "messages.manage"
   | "news.manage"
   | "finance.manage"
+  | "finance.view"
+  | "finance.payments"
+  | "finance.expenses"
+  | "finance.payouts"
+  | "finance.cash"
+  | "finance.reports"
+  | "finance.owner"
   | "reports.view"
   | "transport.view"
   | "transport.manage"
@@ -32,6 +39,13 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "messages.manage",
     "news.manage",
     "finance.manage",
+    "finance.view",
+    "finance.payments",
+    "finance.expenses",
+    "finance.payouts",
+    "finance.cash",
+    "finance.reports",
+    "finance.owner",
     "reports.view",
     "transport.view",
     "transport.manage",
@@ -48,6 +62,13 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "messages.view",
     "messages.manage",
     "news.manage",
+    "finance.manage",
+    "finance.view",
+    "finance.payments",
+    "finance.expenses",
+    "finance.payouts",
+    "finance.cash",
+    "finance.reports",
     "reports.view",
     "transport.view",
     "transport.manage",
@@ -59,6 +80,10 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "enrollments.view",
     "enrollments.manage",
     "messages.view",
+    "finance.view",
+    "finance.payments",
+    "finance.expenses",
+    "finance.cash",
     "reports.view",
     "transport.view",
     "transport.record",
@@ -116,7 +141,7 @@ export function canAccessAdminPath(role: UserRole, pathname: string): boolean {
     return hasPermission(role, "messages.view");
   }
   if (pathname.startsWith("/admin/finance")) {
-    return hasPermission(role, "finance.manage");
+    return hasPermission(role, "finance.view");
   }
 
   return pathname.startsWith("/admin/dashboard");
@@ -125,5 +150,6 @@ export function canAccessAdminPath(role: UserRole, pathname: string): boolean {
 export function getDashboardPath(role: UserRole): string {
   if (isStaffRole(role)) return "/admin/dashboard";
   if (role === "student") return "/student/dashboard";
+  if (role === "teacher") return "/teacher/dashboard";
   return "/";
 }

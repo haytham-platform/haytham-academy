@@ -1,10 +1,10 @@
-import { requireFinance } from "@/lib/auth-helpers";
+import { requireFinanceCash } from "@/lib/auth-helpers";
 import { getCashLedger } from "@/lib/cashbox";
 import { successResponse, errorResponse } from "@/lib/api-response";
 
 export async function GET(request: Request) {
   try {
-    const { error } = await requireFinance();
+    const { error } = await requireFinanceCash();
     if (error) return error;
 
     const { searchParams } = new URL(request.url);

@@ -6,6 +6,7 @@ import SearchBox from "@/components/ui/SearchBox";
 import Filter from "@/components/ui/Filter";
 import Pagination from "@/components/ui/Pagination";
 import EmptyState from "@/components/ui/EmptyState";
+import type { CourseCardData } from "@/types/ui";
 
 const ITEMS_PER_PAGE = 6;
 
@@ -17,19 +18,8 @@ const levelOptions = [
   { value: "جميع المستويات", label: "جميع المستويات" },
 ];
 
-interface Course {
-  _id: string;
-  title: string;
-  description: string;
-  price: number;
-  image: string;
-  level: string;
-  duration: string;
-  teacher?: { name?: string; subject?: string } | null;
-}
-
 interface CoursesGridProps {
-  courses: Course[];
+  courses: CourseCardData[];
 }
 
 export default function CoursesGrid({ courses }: CoursesGridProps) {

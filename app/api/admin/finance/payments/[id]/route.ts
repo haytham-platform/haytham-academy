@@ -1,12 +1,13 @@
 import { connectDB } from "@/lib/db";
 import Payment from "@/models/Payment";
-import { requireFinance } from "@/lib/auth-helpers";
+import { requireFinanceDelete, requireFinanceManager } from "@/lib/auth-helpers";
 import {
   formatPayment,
   validateAmount,
   validateDate,
 } from "@/lib/finance";
 import { reverseSourceEntry } from "@/lib/cashbox";
+import { recordFinancialAudit } from "@/lib/audit";
 import { successResponse, errorResponse } from "@/lib/api-response";
 
 export async function PUT(
@@ -14,7 +15,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { error } = await requireFinance();
+    const { user, error } = await requireFinanceManager();
     if (error) return error;
 
     const { id } = await params;
@@ -39,12 +40,20 @@ export async function PUT(
     if (body.type) update.type = body.type;
     if (body.note !== undefined) update.note = body.note?.trim() || "";
 
-    const payment = await Payment.findByIdAndUpdate(id, update, { new: true })
+    const payment = await Payment.findByIdAndUpdate(id, update, { returnDocument: "after" })
       .populate("studentId", "name phone")
       .populate("courseId", "title")
       .lean();
 
     if (!payment) return errorResponse("الدفعة غير موجودة", 404);
+
+    await recordFinancialAudit({
+      userId: user!._id,
+      action: "payment.update",
+      recordType: "payment",
+      recordId: id,
+      metadata: update,
+    });
 
     return successResponse({
       payment: formatPayment(payment),
@@ -60,7 +69,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { user, error } = await requireFinance();
+    const { user, error } = await requireFinanceDelete();
     if (error) return error;
 
     const { id } = await params;
@@ -77,6 +86,17 @@ export async function DELETE(
       user!._id,
       "in"
     );
+
+    await recordFinancialAudit({
+      userId: user!._id,
+      action: "payment.delete",
+      recordType: "payment",
+      recordId: id,
+      metadata: {
+        receiptNumber: payment.receiptNumber,
+        amount: payment.amount,
+      },
+    });
 
     return successResponse({ message: "تم حذف الدفعة بنجاح" });
   } catch (err) {

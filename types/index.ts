@@ -9,6 +9,8 @@ export type EnrollmentStatus = "pending" | "approved" | "rejected" | "cancelled"
 
 export type StudentGender = "male" | "female";
 
+export type StudentStatus = "active" | "inactive" | "pending";
+
 export interface JwtPayload {
   userId: string;
   sessionId: string;

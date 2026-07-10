@@ -18,6 +18,13 @@ interface Payout {
   teacherName?: string;
   courseId?: string;
   courseTitle?: string;
+  numberOfSessions: number;
+  extraSessions: number;
+  sessionRate: number;
+  manualAdjustment: number;
+  totalDue: number;
+  paid: number;
+  remaining: number;
   amount: number;
   payoutType: string;
   payoutDate: string;
@@ -34,6 +41,12 @@ interface Option {
 const emptyForm = {
   teacherId: "",
   courseId: "",
+  numberOfSessions: "0",
+  extraSessions: "0",
+  sessionRate: "0",
+  manualAdjustment: "0",
+  totalDue: "0",
+  paid: "0",
   amount: "",
   payoutType: "fixed",
   payoutDate: new Date().toISOString().slice(0, 10),
@@ -105,7 +118,13 @@ export default function PayoutsTab() {
     setError("");
     const body = {
       ...form,
-      amount: Number(form.amount),
+      amount: Number(form.paid || form.amount),
+      paid: Number(form.paid || form.amount),
+      numberOfSessions: Number(form.numberOfSessions),
+      extraSessions: Number(form.extraSessions),
+      sessionRate: Number(form.sessionRate),
+      manualAdjustment: Number(form.manualAdjustment),
+      totalDue: Number(form.totalDue),
       courseId: form.courseId || undefined,
     };
     const url = editingId
@@ -212,7 +231,7 @@ export default function PayoutsTab() {
                   <td className="p-3">{formatDate(p.payoutDate)}</td>
                   <td className="p-3">
                     <div className="flex gap-2">
-                      <button type="button" onClick={() => { setEditingId(p._id); setForm({ teacherId: p.teacherId, courseId: p.courseId || "", amount: String(p.amount), payoutType: p.payoutType, payoutDate: p.payoutDate.slice(0, 10), status: p.status, note: p.note || "" }); setModalOpen(true); }} className="text-primary">
+                      <button type="button" onClick={() => { setEditingId(p._id); setForm({ teacherId: p.teacherId, courseId: p.courseId || "", numberOfSessions: String(p.numberOfSessions || 0), extraSessions: String(p.extraSessions || 0), sessionRate: String(p.sessionRate || 0), manualAdjustment: String(p.manualAdjustment || 0), totalDue: String(p.totalDue || p.amount), paid: String(p.paid ?? p.amount), amount: String(p.amount), payoutType: p.payoutType, payoutDate: p.payoutDate.slice(0, 10), status: p.status, note: p.note || "" }); setModalOpen(true); }} className="text-primary">
                         <Pencil className="h-4 w-4" />
                       </button>
                       <button type="button" onClick={() => handleDelete(p._id)} className="text-red-600">
@@ -248,7 +267,14 @@ export default function PayoutsTab() {
               ))}
             </select>
           </div>
-          <Input label="المبلغ (د.ج)" type="number" min="1" required value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Input label="عدد الحصص" type="number" min="0" value={form.numberOfSessions} onChange={(e) => setForm({ ...form, numberOfSessions: e.target.value })} />
+            <Input label="حصص إضافية" type="number" min="0" value={form.extraSessions} onChange={(e) => setForm({ ...form, extraSessions: e.target.value })} />
+            <Input label="قيمة الحصة" type="number" min="0" value={form.sessionRate} onChange={(e) => setForm({ ...form, sessionRate: e.target.value })} />
+            <Input label="تعديل يدوي" type="number" value={form.manualAdjustment} onChange={(e) => setForm({ ...form, manualAdjustment: e.target.value })} />
+            <Input label="إجمالي المستحق" type="number" min="0" value={form.totalDue} onChange={(e) => setForm({ ...form, totalDue: e.target.value })} />
+            <Input label="المدفوع" type="number" min="0" value={form.paid} onChange={(e) => setForm({ ...form, paid: e.target.value, amount: e.target.value })} />
+          </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium">نوع المستحق</label>

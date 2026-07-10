@@ -1,7 +1,7 @@
 import { connectDB } from "@/lib/db";
 import mongoose from "mongoose";
 import LessonInvoice from "@/models/LessonInvoice";
-import { requireFinance } from "@/lib/auth-helpers";
+import { requireFinancePayment } from "@/lib/auth-helpers";
 import { validateDate } from "@/lib/finance";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { handleRouteError } from "@/lib/api-errors";
@@ -19,7 +19,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { error } = await requireFinance();
+    const { error } = await requireFinancePayment();
     if (error) return error;
 
     const { id } = await params;
@@ -95,7 +95,7 @@ export async function PUT(
     updates.totalAmount = totalAmount;
     updates.paymentStatus = derivePaymentStatus(paidAmount, totalAmount);
 
-    const invoice = await LessonInvoice.findByIdAndUpdate(id, updates, { new: true })
+    const invoice = await LessonInvoice.findByIdAndUpdate(id, updates, { returnDocument: "after" })
       .populate("studentId", "name phone")
       .populate("teacherId", "name subject adminShare")
       .populate("courseId", "title")
@@ -112,7 +112,7 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { error } = await requireFinance();
+    const { error } = await requireFinancePayment();
     if (error) return error;
 
     const { id } = await params;

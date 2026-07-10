@@ -41,7 +41,13 @@ async function getTeacherData(id: string) {
           image: c.image,
           level: c.level,
           duration: c.duration,
-          teacher: { name: teacher.name, subject: teacher.subject },
+          startDate: c.startDate.toISOString(),
+          seats: c.seats,
+          teacher: {
+            _id: teacher._id.toString(),
+            name: teacher.name,
+            subject: teacher.subject,
+          },
         })),
       };
     }
@@ -60,7 +66,13 @@ async function getTeacherData(id: string) {
     image: c.image,
     level: c.level,
     duration: c.duration,
-    teacher: { name: c.teacher.name, subject: c.teacher.subject },
+    startDate: c.startDate,
+    seats: c.seats,
+    teacher: {
+      _id: c.teacher._id,
+      name: c.teacher.name,
+      subject: c.teacher.subject,
+    },
   }));
 
   return { teacher: mockTeacher, courses };
