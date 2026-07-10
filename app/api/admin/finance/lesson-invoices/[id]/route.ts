@@ -9,6 +9,7 @@ import {
   computeTotalAmount,
   derivePaymentStatus,
   formatLessonInvoice,
+  parseLessonDecimal,
   parseSessionCount,
   resolveStudentInvoiceContext,
   validateLessonInvoiceInput,
@@ -58,14 +59,14 @@ export async function PUT(
       updates.sessionCount = sessionCount;
     }
     if (body.pricePerSession !== undefined) {
-      const price = Number(body.pricePerSession);
+      const price = parseLessonDecimal(body.pricePerSession);
       if (!Number.isFinite(price) || price <= 0) {
         return errorResponse("سعر الحصة يجب أن يكون أكبر من صفر");
       }
       updates.pricePerSession = price;
     }
     if (body.paidAmount !== undefined) {
-      const paid = Number(body.paidAmount);
+      const paid = parseLessonDecimal(body.paidAmount);
       if (!Number.isFinite(paid) || paid < 0) return errorResponse("المبلغ المدفوع غير صالح");
       updates.paidAmount = paid;
     }

@@ -165,7 +165,7 @@ export async function recordPayoutOut(
   amount: number,
   description: string,
   createdBy: string,
-  metadata: Partial<Pick<LedgerParams, "teacherId" | "courseId" | "notes">> = {}
+  metadata: Partial<Pick<LedgerParams, "teacherId" | "courseId" | "paymentMethod" | "notes">> = {}
 ) {
   return recordLedgerEntry({
     type: "teacher_payout",

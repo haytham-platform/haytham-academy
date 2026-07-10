@@ -11,6 +11,7 @@ import {
   computeTotalAmount,
   derivePaymentStatus,
   formatLessonInvoice,
+  parseLessonDecimal,
   parseMonthRange,
   parseSessionCount,
   resolveStudentInvoiceContext,
@@ -97,8 +98,8 @@ export async function POST(request: Request) {
 
     const body = await request.json();
     const sessionCount = parseSessionCount(body.sessionCount);
-    const pricePerSession = Number(body.pricePerSession);
-    const paidAmount = Math.max(0, Number(body.paidAmount) || 0);
+    const pricePerSession = parseLessonDecimal(body.pricePerSession);
+    const paidAmount = parseLessonDecimal(body.paidAmount);
     const invoiceDate = validateDate(body.invoiceDate);
 
     const validationError = validateLessonInvoiceInput({

@@ -42,7 +42,11 @@ export const SESSION_COUNTS = [
 ] as const;
 
 export function formatCurrency(amount: number) {
-  return `${amount.toLocaleString("ar-DZ")} د.ج`;
+  const safeAmount = Number.isFinite(Number(amount)) ? Number(amount) : 0;
+  return `${safeAmount.toLocaleString("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })} دج`;
 }
 
 export function formatDate(d: string | Date) {

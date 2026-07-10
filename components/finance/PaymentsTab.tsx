@@ -7,6 +7,12 @@ import Modal from "@/components/ui/Modal";
 import EmptyState from "@/components/ui/EmptyState";
 import { Input } from "@/components/ui/Input";
 import {
+  createStudentPaymentDocument,
+  DocumentActionButtons,
+  FinancialDocumentView,
+  type FinancialDocumentData,
+} from "@/components/finance/documents/FinancialDocument";
+import {
   formatCurrency,
   formatDate,
   labelOf,
@@ -27,6 +33,7 @@ interface Payment {
   paymentDate: string;
   type: string;
   note?: string;
+  createdBy?: string;
 }
 
 interface Option {
@@ -61,6 +68,7 @@ export default function PaymentsTab() {
   const [to, setTo] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const [viewingDocument, setViewingDocument] = useState<FinancialDocumentData | null>(null);
 
   async function loadPayments() {
     setLoading(true);
@@ -231,6 +239,10 @@ export default function PaymentsTab() {
                   <td className="p-3">{formatDate(p.paymentDate)}</td>
                   <td className="p-3">
                     <div className="flex gap-2">
+                      <DocumentActionButtons
+                        document={createStudentPaymentDocument(p)}
+                        onView={setViewingDocument}
+                      />
                       <button type="button" onClick={() => openEdit(p)} className="text-primary">
                         <Pencil className="h-4 w-4" />
                       </button>
@@ -300,6 +312,10 @@ export default function PaymentsTab() {
           <Input label="ملاحظة" value={form.note} onChange={(e) => setForm({ ...form, note: e.target.value })} />
           <Button type="submit" fullWidth>{editingId ? "حفظ التعديل" : "إضافة"}</Button>
         </form>
+      </Modal>
+
+      <Modal open={Boolean(viewingDocument)} onClose={() => setViewingDocument(null)} title="عرض المستند" size="lg">
+        {viewingDocument && <FinancialDocumentView document={viewingDocument} />}
       </Modal>
     </div>
   );

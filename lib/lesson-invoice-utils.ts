@@ -1,4 +1,5 @@
 import type { LessonPaymentStatus } from "@/models/LessonInvoice";
+import { parseDecimal, round2 } from "@/lib/decimal";
 
 /** Normalize an id for strict equality checks (24-char hex ObjectId string). */
 export function normalizeId(value: unknown): string {
@@ -41,17 +42,21 @@ export function derivePaymentStatus(
 }
 
 export function computeTotalAmount(sessionCount: number, pricePerSession: number): number {
-  return sessionCount * pricePerSession;
+  return round2(sessionCount * pricePerSession);
 }
 
 export function computeRemainingAmount(totalAmount: number, paidAmount: number): number {
-  return Math.max(0, totalAmount - paidAmount);
+  return round2(Math.max(0, totalAmount - paidAmount));
 }
 
 export function parseSessionCount(value: unknown): number | null {
   const n = Number(value);
   if (!Number.isInteger(n) || n < 1) return null;
   return n;
+}
+
+export function parseLessonDecimal(value: unknown): number {
+  return round2(parseDecimal(value));
 }
 
 export function validateLessonInvoiceInput(input: {
@@ -64,6 +69,9 @@ export function validateLessonInvoiceInput(input: {
   if (!input.sessionCount) return "عدد الحصص يجب أن يكون رقماً صحيحاً أكبر من صفر";
   if (!Number.isFinite(input.pricePerSession) || input.pricePerSession <= 0) {
     return "سعر الحصة يجب أن يكون أكبر من صفر";
+  }
+  if (!Number.isFinite(input.paidAmount) || input.paidAmount < 0) {
+    return "المبلغ المدفوع غير صالح";
   }
   const total = computeTotalAmount(input.sessionCount, input.pricePerSession);
   if (input.paidAmount > total) {

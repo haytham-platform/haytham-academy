@@ -4,9 +4,17 @@ import { useEffect, useMemo, useState } from "react";
 import { Plus, Pencil, Trash2 } from "lucide-react";
 import Button from "@/components/ui/Button";
 import EmptyState from "@/components/ui/EmptyState";
+import Modal from "@/components/ui/Modal";
 import { Input } from "@/components/ui/Input";
 import {
+  createStudentInvoiceDocument,
+  DocumentActionButtons,
+  FinancialDocumentView,
+  type FinancialDocumentData,
+} from "@/components/finance/documents/FinancialDocument";
+import {
   derivePaymentStatus,
+  parseLessonDecimal,
   parseSessionCount,
   validateLessonInvoiceInput,
 } from "@/lib/lesson-invoice-utils";
@@ -27,12 +35,14 @@ interface Invoice {
   courseTitle?: string;
   subject: string;
   sessionCount: number;
+  pricePerSession: number;
   totalAmount: number;
   paidAmount: number;
   remainingAmount: number;
   paymentStatus: string;
   invoiceDate: string;
   note?: string;
+  createdBy?: string;
 }
 
 interface StudentOption {
@@ -88,10 +98,11 @@ export default function LessonInvoicesTab() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [refreshKey, setRefreshKey] = useState(0);
+  const [viewingDocument, setViewingDocument] = useState<FinancialDocumentData | null>(null);
 
   const sessionCountNum = parseSessionCount(form.sessionCount);
-  const priceNum = Number(form.pricePerSession);
-  const paidNum = Number(form.paidAmount) || 0;
+  const priceNum = parseLessonDecimal(form.pricePerSession);
+  const paidNum = parseLessonDecimal(form.paidAmount);
 
   const computedTotal = useMemo(() => {
     if (!sessionCountNum || !Number.isFinite(priceNum) || priceNum <= 0) return 0;
@@ -376,8 +387,6 @@ export default function LessonInvoicesTab() {
                 <ReadOnlyField label="الدورة" value={studentContext.courseTitle} />
                 <ReadOnlyField label="المادة" value={studentContext.subject} />
                 <ReadOnlyField label="الأستاذ" value={studentContext.teacherName} />
-                <ReadOnlyField label="نسبة الإدارة" value={`${studentContext.adminShare}%`} />
-                <ReadOnlyField label="نسبة الأستاذ" value={`${studentContext.teacherShare}%`} />
               </>
             )}
 
@@ -393,9 +402,10 @@ export default function LessonInvoicesTab() {
 
             <Input
               label="سعر الحصة (د.ج) *"
-              type="number"
+              type="text"
+              inputMode="decimal"
               min={1}
-              step={1}
+              step="0.01"
               required
               value={form.pricePerSession}
               onChange={(e) => setForm({ ...form, pricePerSession: e.target.value })}
@@ -403,9 +413,10 @@ export default function LessonInvoicesTab() {
 
             <Input
               label="المبلغ المدفوع (د.ج)"
-              type="number"
+              type="text"
+              inputMode="decimal"
               min={0}
-              step={1}
+              step="0.01"
               value={form.paidAmount}
               onChange={(e) => setForm({ ...form, paidAmount: e.target.value })}
             />
@@ -513,6 +524,10 @@ export default function LessonInvoicesTab() {
                   <td className="p-3">{formatDate(inv.invoiceDate)}</td>
                   <td className="p-3">
                     <div className="flex gap-2">
+                      <DocumentActionButtons
+                        document={createStudentInvoiceDocument(inv)}
+                        onView={setViewingDocument}
+                      />
                       <button type="button" onClick={() => openEdit(inv)} className="text-primary hover:underline" title="تعديل">
                         <Pencil className="h-4 w-4" />
                       </button>
@@ -529,6 +544,10 @@ export default function LessonInvoicesTab() {
       ) : (
         <EmptyState title="لا توجد فواتير" description="اضغط «إضافة فاتورة طالب» لإنشاء أول فاتورة" />
       )}
+
+      <Modal open={Boolean(viewingDocument)} onClose={() => setViewingDocument(null)} title="عرض المستند" size="lg">
+        {viewingDocument && <FinancialDocumentView document={viewingDocument} />}
+      </Modal>
     </div>
   );
 }

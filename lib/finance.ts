@@ -5,11 +5,13 @@ import "@/models/Teacher";
 import Payment from "@/models/Payment";
 import Expense from "@/models/Expense";
 import TeacherPayout from "@/models/TeacherPayout";
+import TeacherPayment from "@/models/TeacherPayment";
 import Enrollment from "@/models/Enrollment";
 import Cashbox from "@/models/Cashbox";
 import CashLedger from "@/models/CashLedger";
 import DailyCashClosure from "@/models/DailyCashClosure";
 import { connectDB } from "@/lib/db";
+import { round2 } from "@/lib/decimal";
 
 export type FinancePeriod = "today" | "week" | "month" | "year";
 
@@ -90,13 +92,15 @@ async function sumExpenses(start: Date, end: Date, extra: Record<string, unknown
 }
 
 async function sumPaidPayouts(start: Date, end: Date, extra: Record<string, unknown> = {}) {
-  const result = await TeacherPayout.aggregate([
+  const teacherPaymentMatch: Record<string, unknown> = {
+    paymentDate: { $gte: start, $lte: end },
+    status: "active",
+  };
+  if (extra.teacherId) teacherPaymentMatch.teacherId = extra.teacherId;
+
+  const result = await TeacherPayment.aggregate([
     {
-      $match: {
-        payoutDate: { $gte: start, $lte: end },
-        status: "paid",
-        ...extra,
-      },
+      $match: teacherPaymentMatch,
     },
     { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
   ]);
@@ -105,7 +109,7 @@ async function sumPaidPayouts(start: Date, end: Date, extra: Record<string, unkn
 
 async function sumPendingPayouts(extra: Record<string, unknown> = {}) {
   const result = await TeacherPayout.aggregate([
-    { $match: { status: "pending", ...extra } },
+    { $match: { status: "pending", invoiceStatus: { $ne: "cancelled" }, ...extra } },
     {
       $group: {
         _id: null,
@@ -305,10 +309,11 @@ export async function computeReport(params: {
         $match: {
           payoutDate: { $gte: start, $lte: end },
           status: "pending",
+          invoiceStatus: { $ne: "cancelled" },
           ...extraPayouts,
         },
       },
-      { $group: { _id: null, total: { $sum: "$amount" }, count: { $sum: 1 } } },
+      { $group: { _id: null, total: { $sum: { $ifNull: ["$remaining", "$amount"] } }, count: { $sum: 1 } } },
     ]),
   ]);
 
@@ -385,16 +390,33 @@ export function formatPayout(p: unknown) {
     teacherName: teacher?.name,
     courseId: course?._id?.toString?.() ?? record.courseId,
     courseTitle: course?.title,
+    recordType: record.recordType ?? "payout",
+    academicSeason: record.academicSeason ?? "",
+    invoicePeriod: record.invoicePeriod ?? "",
+    completedSessionIds: Array.isArray(record.completedSessionIds)
+      ? record.completedSessionIds.map((id) => id?.toString?.() ?? String(id))
+      : [],
     numberOfSessions: record.numberOfSessions ?? 0,
     extraSessions: record.extraSessions ?? 0,
-    sessionRate: record.sessionRate ?? 0,
-    manualAdjustment: record.manualAdjustment ?? 0,
-    totalDue: record.totalDue ?? record.amount,
-    paid: record.paid ?? record.amount,
-    remaining: record.remaining ?? 0,
-    amount: record.amount,
+    sessionRate: round2(Number(record.sessionRate ?? 0)),
+    grossAmount: round2(Number(record.grossAmount ?? 0)),
+    administrationPercentage: round2(Number(record.administrationPercentage ?? 0)),
+    teacherPercentage: round2(Number(record.teacherPercentage ?? 0)),
+    administrationShare: round2(Number(record.administrationShare ?? 0)),
+    teacherShareAmount: round2(Number(record.teacherShareAmount ?? 0)),
+    deductions: round2(Number(record.deductions ?? 0)),
+    netTeacherAmount: round2(Number(record.netTeacherAmount ?? record.totalDue ?? record.amount ?? 0)),
+    manualAdjustment: round2(Number(record.manualAdjustment ?? 0)),
+    totalDue: round2(Number(record.totalDue ?? record.amount ?? 0)),
+    paid: round2(Number(record.paid ?? record.amount ?? 0)),
+    remaining: round2(Number(record.remaining ?? 0)),
+    amount: round2(Number(record.amount ?? 0)),
     payoutType: record.payoutType,
     payoutDate: toIso(record.payoutDate),
+    paymentDate: toIso(record.paymentDate),
+    paymentMethod: record.paymentMethod ?? "",
+    paymentStatus: record.paymentStatus ?? (record.status === "paid" ? "paid" : "unpaid"),
+    invoiceStatus: record.invoiceStatus ?? "active",
     note: record.note,
     status: record.status,
     createdBy: record.createdBy?.toString?.() ?? record.createdBy,

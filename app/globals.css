@@ -107,3 +107,27 @@ body {
 .accent-surface {
   @apply bg-accent/10;
 }
+
+@media print {
+  @page {
+    size: A4;
+    margin: 14mm;
+  }
+
+  body {
+    background: #fff;
+  }
+
+  aside,
+  nav,
+  button,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  .financial-document {
+    box-shadow: none !important;
+    max-width: none !important;
+    page-break-inside: avoid;
+  }
+}
