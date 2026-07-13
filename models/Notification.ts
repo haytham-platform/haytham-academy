@@ -34,7 +34,7 @@ const NotificationSchema = new Schema<INotification>(
     },
     audienceRoles: {
       type: [String],
-      enum: ["admin", "deputy", "secretary", "teacher", "student"],
+      enum: ["admin", "deputy", "secretary", "teacher", "parent", "student"],
       default: [],
     },
     userId: { type: Schema.Types.ObjectId, ref: "User" },

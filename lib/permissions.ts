@@ -107,6 +107,13 @@ export type Permission =
   | "teacher.schedule.view"
   | "teacher.documents.view"
   | "teacher.reports.view"
+  | "parent.dashboard.view"
+  | "parent.students.view"
+  | "parent.attendance.view"
+  | "parent.finance.view"
+  | "parent.documents.view"
+  | "parent.reports.view"
+  | "parent.communications.view"
   | "transport.view"
   | "transport.manage"
   | "transport.record";
@@ -360,6 +367,16 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "teacher.reports.view",
     "notifications.view",
   ],
+  parent: [
+    "parent.dashboard.view",
+    "parent.students.view",
+    "parent.attendance.view",
+    "parent.finance.view",
+    "parent.documents.view",
+    "parent.reports.view",
+    "parent.communications.view",
+    "notifications.view",
+  ],
   student: [],
 };
 
@@ -434,5 +451,6 @@ export function getDashboardPath(role: UserRole): string {
   if (isStaffRole(role)) return "/admin/dashboard";
   if (role === "student") return "/student/dashboard";
   if (role === "teacher") return "/teacher/dashboard";
+  if (role === "parent") return "/parent/dashboard";
   return "/";
 }

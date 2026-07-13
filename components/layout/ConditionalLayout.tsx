@@ -11,7 +11,7 @@ export default function ConditionalLayout({
 }) {
   const pathname = usePathname();
   const isDashboard =
-    pathname.startsWith("/admin") || pathname.startsWith("/student") || pathname.startsWith("/teacher");
+    pathname.startsWith("/admin") || pathname.startsWith("/student") || pathname.startsWith("/teacher") || pathname.startsWith("/parent");
 
   if (isDashboard) {
     return <>{children}</>;

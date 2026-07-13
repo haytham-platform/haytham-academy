@@ -3,6 +3,7 @@ export type UserRole =
   | "deputy"
   | "secretary"
   | "teacher"
+  | "parent"
   | "student";
 
 export type EnrollmentStatus =

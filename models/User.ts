@@ -104,7 +104,7 @@ const UserSchema = new Schema<IUser>(
     password: { type: String, required: true, select: false },
     role: {
       type: String,
-      enum: ["admin", "deputy", "secretary", "teacher", "student"],
+      enum: ["admin", "deputy", "secretary", "teacher", "parent", "student"],
       default: "student",
     },
     isActive: { type: Boolean, default: true },
