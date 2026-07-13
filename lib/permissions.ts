@@ -56,6 +56,14 @@ export type Permission =
   | "kindergarten.payments"
   | "kindergarten.correct_payments"
   | "reports.view"
+  | "reports.export"
+  | "reports.print"
+  | "reports.finance"
+  | "reports.students"
+  | "reports.teachers"
+  | "reports.attendance"
+  | "reports.private_lessons"
+  | "reports.kindergarten"
   | "transport.view"
   | "transport.manage"
   | "transport.record";
@@ -117,6 +125,14 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "kindergarten.payments",
     "kindergarten.correct_payments",
     "reports.view",
+    "reports.export",
+    "reports.print",
+    "reports.finance",
+    "reports.students",
+    "reports.teachers",
+    "reports.attendance",
+    "reports.private_lessons",
+    "reports.kindergarten",
     "transport.view",
     "transport.manage",
     "transport.record",
@@ -162,6 +178,13 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "kindergarten.manage",
     "kindergarten.payments",
     "reports.view",
+    "reports.export",
+    "reports.print",
+    "reports.students",
+    "reports.teachers",
+    "reports.attendance",
+    "reports.private_lessons",
+    "reports.kindergarten",
     "transport.view",
     "transport.manage",
     "transport.record",
@@ -196,6 +219,10 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "kindergarten.manage",
     "kindergarten.payments",
     "reports.view",
+    "reports.students",
+    "reports.attendance",
+    "reports.private_lessons",
+    "reports.kindergarten",
     "transport.view",
     "transport.record",
   ],

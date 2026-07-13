@@ -8,6 +8,7 @@ import { requirePermission } from "@/lib/auth-helpers";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { getStudentFinanceStats } from "@/lib/student-finance";
 import { getPrivateLessonStats } from "@/lib/private-lessons";
+import { buildDashboardAnalytics } from "@/lib/reports-analytics";
 
 function startOfMonth(date = new Date()) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -44,6 +45,7 @@ export async function GET() {
       recentMessages,
       studentFinanceStats,
       privateLessonStats,
+      dashboardAnalytics,
     ] = await Promise.all([
       User.countDocuments(studentBase),
       User.countDocuments({ ...studentBase, createdAt: { $gte: monthStart } }),
@@ -109,6 +111,7 @@ export async function GET() {
       ContactMessage.find().sort({ createdAt: -1 }).limit(5).lean(),
       getStudentFinanceStats(),
       getPrivateLessonStats(),
+      buildDashboardAnalytics(),
     ]);
 
     const topCourse = topCourseAgg[0]
@@ -146,6 +149,7 @@ export async function GET() {
         topTeacher,
         studentFinance: studentFinanceStats,
         privateLessons: privateLessonStats,
+        analytics: dashboardAnalytics,
       },
       recentEnrollments: recentEnrollments.map((e) => ({
         _id: e._id.toString(),
