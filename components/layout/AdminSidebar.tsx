@@ -16,6 +16,8 @@ import {
   Wallet,
   FileBarChart,
   Bus,
+  Archive,
+  CalendarRange,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { hasPermission, type Permission } from "@/lib/permissions";
@@ -36,6 +38,8 @@ const adminLinks: {
   { href: "/admin/enrollments", label: "التسجيلات", icon: ClipboardList, permission: "enrollments.view" },
   { href: "/admin/transport", label: "النقل", icon: Bus, permission: "transport.view" },
   { href: "/admin/reports", label: "التقارير", icon: FileBarChart, permission: "reports.view" },
+  { href: "/admin/academic-seasons", label: "المواسم الدراسية", icon: CalendarRange, permission: "academic_seasons.view" },
+  { href: "/admin/archive", label: "الأرشيف", icon: Archive, permission: "archive.view" },
   { href: "/admin/finance", label: "الحسابات والمالية", icon: Wallet, permission: "finance.view" },
   { href: "/admin/news", label: "الأخبار", icon: Newspaper, permission: "news.manage" },
   { href: "/admin/settings", label: "الإعدادات", icon: Settings, permission: "settings.manage" },

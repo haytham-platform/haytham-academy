@@ -65,6 +65,19 @@ const REPORTS = [
   { key: "invoices", title: "الفواتير", category: "invoices" },
   { key: "audit_logs", title: "سجلات التدقيق", category: "audit_logs" },
   { key: "dashboard_analytics", title: "لوحة التحكم", category: "analytics" },
+  { key: "rollover_students", title: "الطلاب المرحلون", category: "academic_seasons" },
+  { key: "promoted_students", title: "الطلاب المرقون", category: "academic_seasons" },
+  { key: "repeating_students", title: "الطلاب المعيدون", category: "academic_seasons" },
+  { key: "transferred_students", title: "الطلاب المحولون", category: "academic_seasons" },
+  { key: "rollover_graduated_students", title: "خريجو الترحيل", category: "academic_seasons" },
+  { key: "rollover_withdrawn_students", title: "منسحبو الترحيل", category: "academic_seasons" },
+  { key: "rollover_archived_students", title: "مؤرشفو الترحيل", category: "academic_seasons" },
+  { key: "failed_rollover_items", title: "فشل الترحيل", category: "academic_seasons" },
+  { key: "rollover_conflicts", title: "تعارضات الترحيل", category: "academic_seasons" },
+  { key: "financial_carry_forward", title: "ترحيل الأرصدة", category: "academic_seasons" },
+  { key: "transportation_rollover", title: "ترحيل النقل", category: "academic_seasons" },
+  { key: "kindergarten_rollover", title: "ترحيل الروضة", category: "academic_seasons" },
+  { key: "season_comparison", title: "مقارنة المواسم", category: "academic_seasons" },
 ] as const;
 
 const CATEGORIES = [
@@ -85,6 +98,7 @@ const CATEGORIES = [
   { key: "revenue", label: "الإيرادات" },
   { key: "audit_logs", label: "التدقيق" },
   { key: "analytics", label: "التحليلات" },
+  { key: "academic_seasons", label: "المواسم" },
 ] as const;
 
 interface ReportColumn { key: string; label: string }

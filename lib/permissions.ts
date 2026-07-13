@@ -64,6 +64,23 @@ export type Permission =
   | "reports.attendance"
   | "reports.private_lessons"
   | "reports.kindergarten"
+  | "academic_seasons.view"
+  | "academic_seasons.create"
+  | "academic_seasons.update"
+  | "academic_seasons.activate"
+  | "academic_seasons.close"
+  | "academic_seasons.reopen"
+  | "academic_seasons.archive"
+  | "academic_seasons.restore"
+  | "academic_seasons.rollover"
+  | "academic_seasons.rollover_preview"
+  | "academic_seasons.rollover_execute"
+  | "academic_seasons.rollover_override"
+  | "academic_seasons.export"
+  | "academic_seasons.print"
+  | "archive.view"
+  | "archive.restore"
+  | "archive.export"
   | "transport.view"
   | "transport.manage"
   | "transport.record";
@@ -133,6 +150,23 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "reports.attendance",
     "reports.private_lessons",
     "reports.kindergarten",
+    "academic_seasons.view",
+    "academic_seasons.create",
+    "academic_seasons.update",
+    "academic_seasons.activate",
+    "academic_seasons.close",
+    "academic_seasons.reopen",
+    "academic_seasons.archive",
+    "academic_seasons.restore",
+    "academic_seasons.rollover",
+    "academic_seasons.rollover_preview",
+    "academic_seasons.rollover_execute",
+    "academic_seasons.rollover_override",
+    "academic_seasons.export",
+    "academic_seasons.print",
+    "archive.view",
+    "archive.restore",
+    "archive.export",
     "transport.view",
     "transport.manage",
     "transport.record",
@@ -185,6 +219,23 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "reports.attendance",
     "reports.private_lessons",
     "reports.kindergarten",
+    "academic_seasons.view",
+    "academic_seasons.create",
+    "academic_seasons.update",
+    "academic_seasons.activate",
+    "academic_seasons.close",
+    "academic_seasons.reopen",
+    "academic_seasons.archive",
+    "academic_seasons.restore",
+    "academic_seasons.rollover",
+    "academic_seasons.rollover_preview",
+    "academic_seasons.rollover_execute",
+    "academic_seasons.rollover_override",
+    "academic_seasons.export",
+    "academic_seasons.print",
+    "archive.view",
+    "archive.restore",
+    "archive.export",
     "transport.view",
     "transport.manage",
     "transport.record",
@@ -223,6 +274,12 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "reports.attendance",
     "reports.private_lessons",
     "reports.kindergarten",
+    "academic_seasons.view",
+    "academic_seasons.rollover_preview",
+    "academic_seasons.export",
+    "academic_seasons.print",
+    "archive.view",
+    "archive.export",
     "transport.view",
     "transport.record",
   ],
@@ -271,6 +328,12 @@ export function canAccessAdminPath(role: UserRole, pathname: string): boolean {
   }
   if (pathname.startsWith("/admin/reports")) {
     return hasPermission(role, "reports.view");
+  }
+  if (pathname.startsWith("/admin/academic-seasons")) {
+    return hasPermission(role, "academic_seasons.view");
+  }
+  if (pathname.startsWith("/admin/archive")) {
+    return hasPermission(role, "archive.view");
   }
   if (pathname.startsWith("/admin/transport")) {
     return hasAnyPermission(role, ["transport.view", "transport.manage", "transport.record"]);

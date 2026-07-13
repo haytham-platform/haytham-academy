@@ -10,6 +10,8 @@ import TransportSubscription from "@/models/TransportSubscription";
 import AuditLog from "@/models/AuditLog";
 import FinancialAuditLog from "@/models/FinancialAuditLog";
 import KindergartenRegistration from "@/models/Kindergarten";
+import AcademicSeason from "@/models/AcademicSeason";
+import RolloverJob from "@/models/RolloverJob";
 import { PrivateLesson, TeacherLessonCompensation } from "@/models/PrivateLesson";
 import { StudentAttendance, StudentPerformance } from "@/models/StudentRecords";
 import { StudentCharge, StudentPayment, StudentRefund } from "@/models/StudentFinance";
@@ -105,6 +107,19 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
   { key: "invoices", title: "الفواتير", category: "invoices", permission: "reports.finance", description: "فواتير ومستحقات الأساتذة" },
   { key: "audit_logs", title: "سجلات التدقيق", category: "audit_logs", permission: "reports.view", description: "عمليات التدقيق العامة والمالية" },
   { key: "dashboard_analytics", title: "تحليلات لوحة التحكم", category: "analytics", permission: "reports.view", description: "مؤشرات ورسوم لوحة التحكم" },
+  { key: "rollover_students", title: "الطلاب المرحلون", category: "academic_seasons", permission: "reports.students", description: "نتائج ترحيل الطلاب حسب الموسم" },
+  { key: "promoted_students", title: "الطلاب المرقون", category: "academic_seasons", permission: "reports.students", description: "طلاب تمت ترقيتهم" },
+  { key: "repeating_students", title: "الطلاب المعيدون", category: "academic_seasons", permission: "reports.students", description: "طلاب أعادوا المستوى" },
+  { key: "transferred_students", title: "الطلاب المحولون", category: "academic_seasons", permission: "reports.students", description: "طلاب تم تحويلهم" },
+  { key: "rollover_graduated_students", title: "خريجو الترحيل", category: "academic_seasons", permission: "reports.students", description: "طلاب تخرجوا عبر الترحيل" },
+  { key: "rollover_withdrawn_students", title: "منسحبو الترحيل", category: "academic_seasons", permission: "reports.students", description: "طلاب انسحبوا عبر الترحيل" },
+  { key: "rollover_archived_students", title: "مؤرشفو الترحيل", category: "academic_seasons", permission: "reports.students", description: "طلاب أرشفوا عبر الترحيل" },
+  { key: "failed_rollover_items", title: "عناصر الترحيل الفاشلة", category: "academic_seasons", permission: "reports.students", description: "العناصر التي فشل تنفيذها" },
+  { key: "rollover_conflicts", title: "تعارضات الترحيل", category: "academic_seasons", permission: "reports.students", description: "تعارضات وتحذيرات المعاينة" },
+  { key: "financial_carry_forward", title: "ترحيل الأرصدة المالية", category: "academic_seasons", permission: "reports.finance", description: "الأرصدة الافتتاحية المرحّلة" },
+  { key: "transportation_rollover", title: "ترحيل النقل", category: "academic_seasons", permission: "reports.view", description: "تحذيرات النقل في الترحيل" },
+  { key: "kindergarten_rollover", title: "ترحيل الروضة", category: "academic_seasons", permission: "reports.kindergarten", description: "تحذيرات الروضة في الترحيل" },
+  { key: "season_comparison", title: "مقارنة المواسم", category: "academic_seasons", permission: "reports.view", description: "مقارنة طلاب وإيرادات المواسم" },
 ];
 
 const definitionMap = new Map(REPORT_DEFINITIONS.map((definition) => [definition.key, definition]));
@@ -504,7 +519,67 @@ async function transportationReport(type: string, searchParams: URLSearchParams,
   return reportBase(type, rows.map((row: AnyRecord) => ({ student: display(row.studentId), bus: row.busId?.name || row.busId?.plateNumber || "", pickup: row.pickupPoint, dropoff: row.dropoffPoint, status: row.status, startDate: formatDate(row.startDate), endDate: formatDate(row.endDate) })), [{ key: "student", label: "الطالب" }, { key: "bus", label: "الحافلة" }, { key: "pickup", label: "نقطة الصعود" }, { key: "dropoff", label: "نقطة النزول" }, { key: "status", label: "الحالة" }, { key: "startDate", label: "البداية" }, { key: "endDate", label: "النهاية" }], { total }, searchParams, buildPaginationMeta(total, pagination));
 }
 
+async function rolloverReport(type: string, searchParams: URLSearchParams, pagination: PaginationParams) {
+  if (type === "season_comparison") {
+    const seasons = await AcademicSeason.find({}).sort({ startDate: -1 }).limit(12).lean();
+    const rows = await Promise.all(seasons.map(async (season) => {
+      const [students, revenue, outstanding] = await Promise.all([
+        User.countDocuments({ role: "student", academicSeason: season.code }),
+        StudentPayment.aggregate([{ $match: { academicSeason: season.code, status: "completed" } }, { $group: { _id: null, total: { $sum: "$amountMinor" } } }]),
+        StudentCharge.aggregate([{ $match: { academicSeason: season.code, balanceMinor: { $gt: 0 } } }, { $group: { _id: null, total: { $sum: "$balanceMinor" } } }]),
+      ]);
+      return { season: season.code, status: season.status, students, revenue: amount(revenue[0]?.total), outstanding: amount(outstanding[0]?.total) };
+    }));
+    return reportBase(type, rows, [{ key: "season", label: "الموسم" }, { key: "status", label: "الحالة" }, { key: "students", label: "الطلاب" }, { key: "revenue", label: "الإيرادات" }, { key: "outstanding", label: "الأرصدة" }], { seasons: rows.length }, searchParams);
+  }
+  if (type === "financial_carry_forward") {
+    const filter: AnyRecord = { relatedRecordType: "season_opening_balance" };
+    if (searchParams.get("academicSeason")) filter.academicSeason = searchParams.get("academicSeason");
+    const [rows, total, summary] = await Promise.all([
+      StudentCharge.find(filter).populate("studentId", "name").sort({ createdAt: -1 }).skip(pagination.skip).limit(pagination.limit).lean(),
+      StudentCharge.countDocuments(filter),
+      StudentCharge.aggregate([{ $match: filter }, { $group: { _id: null, total: { $sum: "$balanceMinor" }, count: { $sum: 1 } } }]),
+    ]);
+    return reportBase(type, rows.map((row: AnyRecord) => ({ student: display(row.studentId), season: row.academicSeason, amount: amount(row.balanceMinor), reason: row.notes, createdAt: formatDate(row.createdAt) })), [{ key: "student", label: "الطالب" }, { key: "season", label: "الموسم" }, { key: "amount", label: "المبلغ" }, { key: "reason", label: "السبب" }, { key: "createdAt", label: "التاريخ" }], { total, amount: amount(summary[0]?.total) }, searchParams, buildPaginationMeta(total, pagination));
+  }
+  const actionMap: Record<string, string> = {
+    promoted_students: "promote",
+    repeating_students: "repeat",
+    transferred_students: "transfer",
+    rollover_graduated_students: "graduate",
+    rollover_withdrawn_students: "withdraw",
+    rollover_archived_students: "archive",
+  };
+  const statusMap: Record<string, string> = { failed_rollover_items: "failed" };
+  const match: AnyRecord = {};
+  if (searchParams.get("academicSeason")) match.targetSeason = searchParams.get("academicSeason");
+  const itemMatch: AnyRecord = {};
+  if (actionMap[type]) itemMatch["items.action"] = actionMap[type];
+  if (statusMap[type]) itemMatch["items.status"] = statusMap[type];
+  if (type === "transportation_rollover") itemMatch["items.warnings.code"] = "duplicate_transportation_assignment";
+  if (type === "kindergarten_rollover") itemMatch["items.warnings.code"] = "duplicate_kindergarten_registration";
+  const pipeline: mongoose.PipelineStage[] = [{ $match: match }, { $unwind: "$items" }];
+  if (Object.keys(itemMatch).length) pipeline.push({ $match: itemMatch });
+  if (type === "rollover_conflicts") pipeline.push({ $match: { $or: [{ "items.conflicts.0": { $exists: true } }, { "items.warnings.0": { $exists: true } }] } });
+  const [rows, countRows] = await Promise.all([
+    RolloverJob.aggregate([...pipeline, { $sort: { updatedAt: -1 } }, { $skip: pagination.skip }, { $limit: pagination.limit }]),
+    RolloverJob.aggregate([...pipeline, { $count: "total" }]),
+  ]);
+  const total = countRows[0]?.total ?? 0;
+  return reportBase(type, rows.map((row: AnyRecord) => ({
+    job: row._id?.toString?.() ?? "",
+    sourceSeason: row.sourceSeason,
+    targetSeason: row.targetSeason,
+    student: row.items?.preview?.studentName ?? row.items?.studentId?.toString?.(),
+    action: row.items?.action,
+    status: row.items?.status,
+    conflicts: [...(row.items?.conflicts ?? []), ...(row.items?.warnings ?? [])].map((item: AnyRecord) => item.message).join("، "),
+    executedAt: formatDate(row.items?.executedAt),
+  })), [{ key: "job", label: "المهمة" }, { key: "sourceSeason", label: "المصدر" }, { key: "targetSeason", label: "الهدف" }, { key: "student", label: "الطالب" }, { key: "action", label: "الإجراء" }, { key: "status", label: "الحالة" }, { key: "conflicts", label: "التعارضات/التحذيرات" }, { key: "executedAt", label: "تاريخ التنفيذ" }], { total }, searchParams, buildPaginationMeta(total, pagination));
+}
+
 async function genericReport(type: string, searchParams: URLSearchParams, pagination: PaginationParams): Promise<ReportResult> {
+  if (["rollover_students", "promoted_students", "repeating_students", "transferred_students", "rollover_graduated_students", "rollover_withdrawn_students", "rollover_archived_students", "failed_rollover_items", "rollover_conflicts", "financial_carry_forward", "transportation_rollover", "kindergarten_rollover", "season_comparison"].includes(type)) return rolloverReport(type, searchParams, pagination);
   if (type.startsWith("teacher_") || type === "teachers") return teachersReport(type, searchParams, pagination);
   if (["finance_income", "payments", "receipts", "cash_flow", "registration_fees", "tuition_fees", "transportation_income", "other_income", "daily_income", "weekly_income", "monthly_income", "yearly_income", "expenses", "net_profit", "debts", "refunds"].includes(type)) return financeReport(type, searchParams, pagination);
   if (type.includes("attendance") || type === "student_attendance") return attendanceReport(type, searchParams, pagination);

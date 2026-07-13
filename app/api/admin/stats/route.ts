@@ -9,6 +9,8 @@ import { successResponse, errorResponse } from "@/lib/api-response";
 import { getStudentFinanceStats } from "@/lib/student-finance";
 import { getPrivateLessonStats } from "@/lib/private-lessons";
 import { buildDashboardAnalytics } from "@/lib/reports-analytics";
+import AcademicSeason from "@/models/AcademicSeason";
+import RolloverJob from "@/models/RolloverJob";
 
 function startOfMonth(date = new Date()) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -46,6 +48,11 @@ export async function GET() {
       studentFinanceStats,
       privateLessonStats,
       dashboardAnalytics,
+      currentSeason,
+      upcomingSeason,
+      closedSeasons,
+      rolloverProgress,
+      archiveTotals,
     ] = await Promise.all([
       User.countDocuments(studentBase),
       User.countDocuments({ ...studentBase, createdAt: { $gte: monthStart } }),
@@ -112,6 +119,16 @@ export async function GET() {
       getStudentFinanceStats(),
       getPrivateLessonStats(),
       buildDashboardAnalytics(),
+      AcademicSeason.findOne({ isCurrent: true }).lean(),
+      AcademicSeason.findOne({ status: "upcoming" }).sort({ startDate: 1 }).lean(),
+      AcademicSeason.countDocuments({ status: "closed" }),
+      RolloverJob.aggregate([{ $group: { _id: "$status", total: { $sum: "$totalStudents" }, completed: { $sum: "$completed" }, failed: { $sum: "$failed" }, jobs: { $sum: 1 } } }]),
+      Promise.all([
+        AcademicSeason.countDocuments({ status: "archived" }),
+        User.countDocuments({ role: "student", $or: [{ deletedAt: { $ne: null } }, { status: "archived" }] }),
+        Teacher.countDocuments({ deletedAt: { $ne: null } }),
+        Course.countDocuments({ deletedAt: { $ne: null } }),
+      ]),
     ]);
 
     const topCourse = topCourseAgg[0]
@@ -150,6 +167,18 @@ export async function GET() {
         studentFinance: studentFinanceStats,
         privateLessons: privateLessonStats,
         analytics: dashboardAnalytics,
+        academicSeasons: {
+          current: currentSeason,
+          upcoming: upcomingSeason,
+          closedSeasons,
+          rolloverProgress,
+          archiveTotals: {
+            seasons: archiveTotals[0],
+            students: archiveTotals[1],
+            teachers: archiveTotals[2],
+            courses: archiveTotals[3],
+          },
+        },
       },
       recentEnrollments: recentEnrollments.map((e) => ({
         _id: e._id.toString(),

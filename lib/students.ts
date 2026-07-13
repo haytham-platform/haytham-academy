@@ -11,7 +11,6 @@ import {
   StudentGuardianLink,
   StudentNote,
   StudentPerformance,
-  StudentRolloverAudit,
 } from "@/models/StudentRecords";
 import type {
   IStudentAttendance,
@@ -427,26 +426,7 @@ export async function createStudentNote(body: Record<string, unknown>, userId: s
 }
 
 export async function executeStudentRollover(body: Record<string, unknown>, userId: string) {
-  const sourceSeason = trim(body.sourceSeason);
-  const targetSeason = trim(body.targetSeason);
-  if (!sourceSeason || !targetSeason || sourceSeason === targetSeason) throw new Error("Valid source and target seasons are required");
-  const action = trim(body.action) || "promote";
-  const students = await User.find({ role: "student", academicSeason: sourceSeason, deletedAt: null });
-  const changes = [];
-  for (const student of students) {
-    const previous = { status: student.status, academicSeason: student.academicSeason, academicLevel: student.academicLevel };
-    student.academicSeason = targetSeason;
-    if (action === "graduate") student.status = "graduated";
-    if (action === "withdraw") student.status = "withdrawn";
-    if (action === "archive") {
-      student.status = "archived";
-      student.deletedAt = new Date();
-    }
-    student.isActive = statusToIsActive(student.status);
-    await student.save();
-    changes.push({ studentId: student._id.toString(), previous, next: { status: student.status, academicSeason: student.academicSeason, academicLevel: student.academicLevel } });
-  }
-  const audit = await StudentRolloverAudit.create({ sourceSeason, targetSeason, changes, executedBy: userId });
-  await recordAudit({ userId, action: "student.rollover", recordType: "student_rollover", recordId: audit._id.toString(), metadata: { sourceSeason, targetSeason, action, count: changes.length } });
-  return { _id: audit._id.toString(), count: changes.length, changes };
+  void body;
+  void userId;
+  throw new Error("استخدم معاينة ومهام ترحيل المواسم الدراسية لتنفيذ ترحيل آمن.");
 }
