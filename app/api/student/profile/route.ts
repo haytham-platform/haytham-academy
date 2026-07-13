@@ -2,6 +2,15 @@ import { connectDB } from "@/lib/db";
 import { getCurrentUser, hashPassword } from "@/lib/auth";
 import User from "@/models/User";
 import { errorResponse, successResponse } from "@/lib/api-response";
+import { getStudentProfile, StudentPortalError } from "@/lib/student-portal";
+
+export async function GET() {
+  try {
+    return successResponse(await getStudentProfile());
+  } catch (error) {
+    return errorResponse(error instanceof Error ? error.message : "تعذر تحميل الملف الشخصي", error instanceof StudentPortalError ? error.status : 500);
+  }
+}
 
 export async function PUT(request: Request) {
   try {

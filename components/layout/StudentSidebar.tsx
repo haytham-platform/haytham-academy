@@ -2,22 +2,22 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  LayoutDashboard,
-  BookOpen,
-  Bell,
-  User,
-  LogOut,
-  GraduationCap,
-} from "lucide-react";
+import { Bell, BookOpen, CalendarCheck, FileText, GraduationCap, LayoutDashboard, LogOut, ReceiptText, User } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ACADEMY } from "@/lib/constants";
 
 const studentLinks = [
   { href: "/student/dashboard", label: "نظرة عامة", icon: LayoutDashboard },
+  { href: "/student/profile", label: "ملفي الشخصي", icon: User },
+  { href: "/student/schedule", label: "جدولي", icon: CalendarCheck },
   { href: "/student/courses", label: "دوراتي", icon: BookOpen },
-  { href: "/student/notifications", label: "الإشعارات", icon: Bell },
-  { href: "/student/profile", label: "الملف الشخصي", icon: User },
+  { href: "/student/attendance", label: "حضوري", icon: CalendarCheck },
+  { href: "/student/grades", label: "علاماتي", icon: GraduationCap },
+  { href: "/student/private-lessons", label: "الحصص الخاصة", icon: GraduationCap },
+  { href: "/student/finance", label: "ماليتي", icon: ReceiptText },
+  { href: "/student/documents", label: "وثائقي", icon: FileText },
+  { href: "/student/communications", label: "التواصل", icon: Bell },
+  { href: "/student/reports", label: "التقارير", icon: FileText },
 ];
 
 export default function StudentSidebar() {
@@ -37,11 +37,10 @@ export default function StudentSidebar() {
           </div>
           <div>
             <p className="text-xs font-bold text-primary">{ACADEMY.name}</p>
-            <p className="text-[10px] text-muted">لوحة الطالب</p>
+            <p className="text-[10px] text-muted">بوابة الطالب</p>
           </div>
         </Link>
       </div>
-
       <nav className="flex flex-1 flex-col gap-1 p-3" aria-label="قائمة الطالب">
         {studentLinks.map(({ href, label, icon: Icon }) => (
           <Link
@@ -49,23 +48,16 @@ export default function StudentSidebar() {
             href={href}
             className={cn(
               "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition",
-              pathname === href
-                ? "bg-pink-50 text-primary"
-                : "text-foreground hover:bg-gray-50 hover:text-primary"
+              pathname === href || pathname.startsWith(`${href}/`) ? "bg-pink-50 text-primary" : "text-foreground hover:bg-gray-50 hover:text-primary"
             )}
           >
-            <Icon className="h-4 w-4" aria-hidden="true" />
+            <Icon className="h-4 w-4" />
             {label}
           </Link>
         ))}
       </nav>
-
       <div className="border-t border-border p-3">
-        <button
-          type="button"
-          onClick={handleLogout}
-          className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50"
-        >
+        <button type="button" onClick={handleLogout} className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-red-600 transition hover:bg-red-50">
           <LogOut className="h-4 w-4" />
           تسجيل الخروج
         </button>

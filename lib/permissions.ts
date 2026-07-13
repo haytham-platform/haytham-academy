@@ -114,6 +114,15 @@ export type Permission =
   | "parent.documents.view"
   | "parent.reports.view"
   | "parent.communications.view"
+  | "student.dashboard.view"
+  | "student.profile.view"
+  | "student.schedule.view"
+  | "student.attendance.view"
+  | "student.grades.view"
+  | "student.finance.view"
+  | "student.documents.view"
+  | "student.reports.view"
+  | "student.communications.view"
   | "transport.view"
   | "transport.manage"
   | "transport.record";
@@ -377,7 +386,18 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "parent.communications.view",
     "notifications.view",
   ],
-  student: [],
+  student: [
+    "student.dashboard.view",
+    "student.profile.view",
+    "student.schedule.view",
+    "student.attendance.view",
+    "student.grades.view",
+    "student.finance.view",
+    "student.documents.view",
+    "student.reports.view",
+    "student.communications.view",
+    "notifications.view",
+  ],
 };
 
 export const STAFF_ROLES: UserRole[] = ["admin", "deputy", "secretary"];
