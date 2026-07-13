@@ -81,6 +81,23 @@ export type Permission =
   | "archive.view"
   | "archive.restore"
   | "archive.export"
+  | "communications.view"
+  | "communications.create"
+  | "communications.update"
+  | "communications.send"
+  | "communications.schedule"
+  | "communications.cancel"
+  | "communications.retry"
+  | "communications.bulk_send"
+  | "communications.export"
+  | "communications.manage_templates"
+  | "communications.manage_settings"
+  | "communications.view_delivery_logs"
+  | "communications.view_sensitive"
+  | "communications.override_preferences"
+  | "notifications.view"
+  | "notifications.manage"
+  | "notifications.send_system"
   | "transport.view"
   | "transport.manage"
   | "transport.record";
@@ -167,6 +184,23 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "archive.view",
     "archive.restore",
     "archive.export",
+    "communications.view",
+    "communications.create",
+    "communications.update",
+    "communications.send",
+    "communications.schedule",
+    "communications.cancel",
+    "communications.retry",
+    "communications.bulk_send",
+    "communications.export",
+    "communications.manage_templates",
+    "communications.manage_settings",
+    "communications.view_delivery_logs",
+    "communications.view_sensitive",
+    "communications.override_preferences",
+    "notifications.view",
+    "notifications.manage",
+    "notifications.send_system",
     "transport.view",
     "transport.manage",
     "transport.record",
@@ -236,6 +270,20 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "archive.view",
     "archive.restore",
     "archive.export",
+    "communications.view",
+    "communications.create",
+    "communications.update",
+    "communications.send",
+    "communications.schedule",
+    "communications.cancel",
+    "communications.retry",
+    "communications.bulk_send",
+    "communications.export",
+    "communications.manage_templates",
+    "communications.view_delivery_logs",
+    "notifications.view",
+    "notifications.manage",
+    "notifications.send_system",
     "transport.view",
     "transport.manage",
     "transport.record",
@@ -280,6 +328,14 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "academic_seasons.print",
     "archive.view",
     "archive.export",
+    "communications.view",
+    "communications.create",
+    "communications.send",
+    "communications.schedule",
+    "communications.cancel",
+    "communications.export",
+    "communications.view_delivery_logs",
+    "notifications.view",
     "transport.view",
     "transport.record",
   ],
@@ -334,6 +390,12 @@ export function canAccessAdminPath(role: UserRole, pathname: string): boolean {
   }
   if (pathname.startsWith("/admin/archive")) {
     return hasPermission(role, "archive.view");
+  }
+  if (pathname.startsWith("/admin/communications")) {
+    return hasPermission(role, "communications.view");
+  }
+  if (pathname.startsWith("/admin/notifications")) {
+    return hasPermission(role, "notifications.view");
   }
   if (pathname.startsWith("/admin/transport")) {
     return hasAnyPermission(role, ["transport.view", "transport.manage", "transport.record"]);

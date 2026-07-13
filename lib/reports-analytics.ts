@@ -12,6 +12,7 @@ import FinancialAuditLog from "@/models/FinancialAuditLog";
 import KindergartenRegistration from "@/models/Kindergarten";
 import AcademicSeason from "@/models/AcademicSeason";
 import RolloverJob from "@/models/RolloverJob";
+import { Communication, CommunicationDelivery, CommunicationPreference } from "@/models/Communication";
 import { PrivateLesson, TeacherLessonCompensation } from "@/models/PrivateLesson";
 import { StudentAttendance, StudentPerformance } from "@/models/StudentRecords";
 import { StudentCharge, StudentPayment, StudentRefund } from "@/models/StudentFinance";
@@ -120,7 +121,18 @@ export const REPORT_DEFINITIONS: ReportDefinition[] = [
   { key: "transportation_rollover", title: "ترحيل النقل", category: "academic_seasons", permission: "reports.view", description: "تحذيرات النقل في الترحيل" },
   { key: "kindergarten_rollover", title: "ترحيل الروضة", category: "academic_seasons", permission: "reports.kindergarten", description: "تحذيرات الروضة في الترحيل" },
   { key: "season_comparison", title: "مقارنة المواسم", category: "academic_seasons", permission: "reports.view", description: "مقارنة طلاب وإيرادات المواسم" },
-];
+  { key: "communications_sent", title: "????????? ???????", category: "communications", permission: "reports.view", description: "??? ????????? ??? ??????" },
+  { key: "communications_by_channel", title: "????????? ??? ??????", category: "communications", permission: "reports.view", description: "????? ????????? ??? ??????" },
+  { key: "communications_by_category", title: "????????? ??? ?????", category: "communications", permission: "reports.view", description: "????? ????????? ??? ?????" },
+  { key: "communication_delivery_rate", title: "???? ???????", category: "communications", permission: "reports.view", description: "??? ??????? ??????" },
+  { key: "communication_failure_rate", title: "???? ?????", category: "communications", permission: "reports.view", description: "????? ??? ???????" },
+  { key: "pending_communications", title: "????????? ???????", category: "communications", permission: "reports.view", description: "???????? ???????? ???????" },
+  { key: "scheduled_communications", title: "????????? ????????", category: "communications", permission: "reports.view", description: "????????? ????????" },
+  { key: "attendance_alerts_report", title: "??????? ??????", category: "communications", permission: "reports.attendance", description: "????? ?????? ???????" },
+  { key: "payment_reminders_report", title: "??????? ?????", category: "communications", permission: "reports.finance", description: "??????? ?????????" },
+  { key: "bulk_communication_results", title: "????? ??????? ???????", category: "communications", permission: "reports.view", description: "????? ??????? ?????? ?????????" },
+  { key: "communication_opt_out_statistics", title: "???????? ????????", category: "communications", permission: "reports.view", description: "??????? ???? ?????? ???????" },
+  { key: "provider_performance", title: "???? ????????", category: "communications", permission: "reports.view", description: "???? ?????? ??? ??????? ??????" },];
 
 const definitionMap = new Map(REPORT_DEFINITIONS.map((definition) => [definition.key, definition]));
 
@@ -657,12 +669,67 @@ export async function buildDashboardAnalytics(searchParams = new URLSearchParams
   };
 }
 
+async function communicationReport(type: string, searchParams: URLSearchParams, pagination: PaginationParams) {
+  const baseFilter: AnyRecord = { ...dateRange(searchParams, "createdAt") };
+  if (searchParams.get("channel")) baseFilter.channel = searchParams.get("channel");
+  if (searchParams.get("category")) baseFilter.category = searchParams.get("category");
+  if (searchParams.get("status")) baseFilter.status = searchParams.get("status");
+  if (searchParams.get("academicSeason")) baseFilter["related.academicSeason"] = searchParams.get("academicSeason");
+
+  if (type === "communications_by_channel" || type === "communications_by_category") {
+    const groupField = type === "communications_by_channel" ? "$channel" : "$category";
+    const rows = await Communication.aggregate([
+      { $match: baseFilter },
+      { $group: { _id: groupField, total: { $sum: 1 }, recipients: { $sum: "$recipientCount" }, failed: { $sum: { $cond: [{ $eq: ["$status", "failed"] }, 1, 0] } } } },
+      { $sort: { total: -1 } },
+    ]);
+    return reportBase(type, rows.map((row: AnyRecord) => ({ name: row._id || "unknown", total: row.total, recipients: row.recipients, failed: row.failed })), [{ key: "name", label: "Name" }, { key: "total", label: "Total" }, { key: "recipients", label: "Recipients" }, { key: "failed", label: "Failed" }], { total: rows.reduce((sum: number, row: AnyRecord) => sum + row.total, 0) }, searchParams);
+  }
+
+  if (type === "communication_delivery_rate" || type === "communication_failure_rate" || type === "provider_performance") {
+    const rows = await CommunicationDelivery.aggregate([
+      { $match: searchParams.get("channel") ? { channel: searchParams.get("channel") } : {} },
+      { $group: { _id: type === "provider_performance" ? "$provider" : "$status", total: { $sum: 1 } } },
+      { $sort: { total: -1 } },
+    ]);
+    const total = rows.reduce((sum: number, row: AnyRecord) => sum + row.total, 0);
+    return reportBase(type, rows.map((row: AnyRecord) => ({ status: row._id || "unknown", total: row.total, percentage: total ? Math.round((row.total / total) * 100) : 0 })), [{ key: "status", label: "Status" }, { key: "total", label: "Total" }, { key: "percentage", label: "Percentage" }], { total }, searchParams);
+  }
+
+  if (type === "communication_opt_out_statistics") {
+    const rows = await CommunicationPreference.aggregate([{ $group: { _id: "$ownerType", total: { $sum: 1 }, optedOut: { $sum: { $cond: ["$optedOut", 1, 0] } } } }, { $sort: { total: -1 } }]);
+    return reportBase(type, rows.map((row: AnyRecord) => ({ ownerType: row._id, total: row.total, optedOut: row.optedOut })), [{ key: "ownerType", label: "Owner type" }, { key: "total", label: "Total" }, { key: "optedOut", label: "Opted out" }], { total: rows.reduce((sum: number, row: AnyRecord) => sum + row.total, 0) }, searchParams);
+  }
+
+  const listFilter: AnyRecord = { ...baseFilter };
+  if (type === "pending_communications") listFilter.status = { $in: ["draft", "scheduled", "queued", "processing"] };
+  if (type === "scheduled_communications") listFilter.status = "scheduled";
+  if (type === "attendance_alerts_report") listFilter.category = { $in: ["attendance_absence", "attendance_lateness", "attendance"] };
+  if (type === "payment_reminders_report") listFilter.category = { $in: ["payment_due", "payment_overdue", "payment_reminder"] };
+  if (type === "bulk_communication_results") listFilter.recipientCount = { $gt: 1 };
+  const [rows, total] = await Promise.all([
+    Communication.find(listFilter).sort({ createdAt: -1 }).skip((pagination.page - 1) * pagination.limit).limit(pagination.limit).lean(),
+    Communication.countDocuments(listFilter),
+  ]);
+  return reportBase(
+    type,
+    rows.map((row: AnyRecord) => ({ subject: row.subject || row.content, channel: row.channel, category: row.category, status: row.status, recipients: row.recipientCount, failed: row.errorSummary || "", createdAt: formatDate(row.createdAt) })),
+    [{ key: "subject", label: "Subject" }, { key: "channel", label: "Channel" }, { key: "category", label: "Category" }, { key: "status", label: "Status" }, { key: "recipients", label: "Recipients" }, { key: "failed", label: "Failure" }, { key: "createdAt", label: "Created" }],
+    { total },
+    searchParams,
+    buildPaginationMeta(total, pagination)
+  );
+}
+
 export async function buildReport(type: string, searchParams: URLSearchParams): Promise<ReportResult> {
   const exportMode = searchParams.get("export");
   const pagination = parsePagination(searchParams, exportMode ? 100 : 25);
   if (type === "dashboard_analytics") {
     const analytics = await buildDashboardAnalytics(searchParams);
     return reportBase(type, Object.entries(analytics.kpis).map(([name, value]) => ({ name, value })), [{ key: "name", label: "المؤشر" }, { key: "value", label: "القيمة" }], analytics.kpis, searchParams);
+  }
+  if (type.startsWith("communication") || ["communications_sent", "communications_by_channel", "communications_by_category", "pending_communications", "scheduled_communications", "attendance_alerts_report", "payment_reminders_report", "bulk_communication_results", "provider_performance"].includes(type)) {
+    return communicationReport(type, searchParams, pagination);
   }
   if (type.startsWith("student") || ["active_students", "suspended_students", "graduated_students", "archived_students", "new_registrations", "medical_students", "outstanding_balances"].includes(type)) {
     return studentReport(type, searchParams, pagination);
@@ -730,3 +797,4 @@ export async function reportPrintResponse(report: ReportResult, userName?: strin
     headers: { "Content-Type": "text/html; charset=utf-8" },
   });
 }
+

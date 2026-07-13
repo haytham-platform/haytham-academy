@@ -9,6 +9,7 @@ import {
   BookOpen,
   GraduationCap,
   MessageSquare,
+  Bell,
   ClipboardList,
   Newspaper,
   Settings,
@@ -35,6 +36,8 @@ const adminLinks: {
   { href: "/admin/courses", label: "الدورات", icon: BookOpen, permission: "courses.manage" },
   { href: "/admin/teachers", label: "الأساتذة", icon: GraduationCap, permission: "teachers.manage" },
   { href: "/admin/messages", label: "الرسائل", icon: MessageSquare, permission: "messages.view" },
+  { href: "/admin/communications", label: "Communication Center", icon: MessageSquare, permission: "communications.view" },
+  { href: "/admin/notifications", label: "Notifications", icon: Bell, permission: "notifications.view" },
   { href: "/admin/enrollments", label: "التسجيلات", icon: ClipboardList, permission: "enrollments.view" },
   { href: "/admin/transport", label: "النقل", icon: Bus, permission: "transport.view" },
   { href: "/admin/reports", label: "التقارير", icon: FileBarChart, permission: "reports.view" },
@@ -103,3 +106,4 @@ export default function AdminSidebar() {
     </aside>
   );
 }
+

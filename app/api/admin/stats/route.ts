@@ -11,6 +11,7 @@ import { getPrivateLessonStats } from "@/lib/private-lessons";
 import { buildDashboardAnalytics } from "@/lib/reports-analytics";
 import AcademicSeason from "@/models/AcademicSeason";
 import RolloverJob from "@/models/RolloverJob";
+import { communicationDashboardStats } from "@/lib/communications";
 
 function startOfMonth(date = new Date()) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -53,6 +54,7 @@ export async function GET() {
       closedSeasons,
       rolloverProgress,
       archiveTotals,
+      communicationStats,
     ] = await Promise.all([
       User.countDocuments(studentBase),
       User.countDocuments({ ...studentBase, createdAt: { $gte: monthStart } }),
@@ -129,6 +131,7 @@ export async function GET() {
         Teacher.countDocuments({ deletedAt: { $ne: null } }),
         Course.countDocuments({ deletedAt: { $ne: null } }),
       ]),
+      communicationDashboardStats(),
     ]);
 
     const topCourse = topCourseAgg[0]
@@ -179,6 +182,7 @@ export async function GET() {
             courses: archiveTotals[3],
           },
         },
+        communications: communicationStats,
       },
       recentEnrollments: recentEnrollments.map((e) => ({
         _id: e._id.toString(),
