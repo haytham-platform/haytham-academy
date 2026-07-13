@@ -23,7 +23,7 @@ export async function PUT(
     const message = await ContactMessage.findByIdAndUpdate(
       id,
       { isRead: body.isRead },
-      { new: true }
+      { returnDocument: "after" }
     );
 
     if (!message) return errorResponse("الرسالة غير موجودة", 404);

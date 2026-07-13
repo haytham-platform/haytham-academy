@@ -59,6 +59,8 @@ async function reportStudents(
     filter.$or = [
       { name: { $regex: search, $options: "i" } },
       { phone: { $regex: search, $options: "i" } },
+      { guardianName: { $regex: search, $options: "i" } },
+      { guardianPhone: { $regex: search, $options: "i" } },
     ];
   }
 
@@ -73,18 +75,19 @@ async function reportStudents(
     User.countDocuments(filter),
   ]);
 
-  const students = rows.map((s) => formatStudent(s));
+  const students = rows.map((student) => formatStudent(student));
 
   if (exportCsv) {
     const csv = toCsv(
-      ["الاسم", "الهاتف", "الولاية", "المستوى", "الحالة", "تاريخ الإنشاء"],
-      students.map((s) => [
-        s.name,
-        s.phone ?? "",
-        s.wilaya ?? "",
-        s.studyLevel ?? "",
-        s.isActive ? "نشط" : "موقوف",
-        new Date(s.createdAt).toLocaleDateString("ar-DZ"),
+      ["الاسم", "الهاتف", "الولاية", "المستوى الأكاديمي", "القسم", "الحالة", "تاريخ الإنشاء"],
+      students.map((student) => [
+        student.name,
+        student.phone ?? "",
+        student.wilaya ?? "",
+        student.academicLevel ?? student.studyLevel ?? "",
+        student.className ?? "",
+        student.status ?? (student.isActive ? "active" : "suspended"),
+        new Date(student.createdAt).toLocaleDateString("ar-DZ"),
       ])
     );
     return csvResponse("students-report.csv", csv);
@@ -103,33 +106,44 @@ async function reportTeachers(
   exportCsv: boolean
 ) {
   const search = searchParams.get("search")?.trim();
+  const status = searchParams.get("status")?.trim();
+  const employmentType = searchParams.get("employmentType")?.trim();
   const filter: Record<string, unknown> = { deletedAt: null };
   if (search) {
     filter.$or = [
       { name: { $regex: search, $options: "i" } },
+      { phone: { $regex: search, $options: "i" } },
       { subject: { $regex: search, $options: "i" } },
+      { subjects: { $regex: search, $options: "i" } },
+      { academicLevels: { $regex: search, $options: "i" } },
+      { assignedClasses: { $regex: search, $options: "i" } },
     ];
   }
+  if (status) filter.status = status;
+  if (employmentType) filter.employmentType = employmentType;
 
-  const sort = parseSort(searchParams, ["name", "createdAt", "subject"], "createdAt");
+  const sort = parseSort(searchParams, ["name", "createdAt", "subject", "status", "employmentType"], "createdAt");
   const [rows, total] = await Promise.all([
     Teacher.find(filter).sort(sort).skip(pagination.skip).limit(pagination.limit).lean(),
     Teacher.countDocuments(filter),
   ]);
 
-  const teachers = rows.map((t) => formatTeacher(t));
+  const teachers = rows.map((teacher) => formatTeacher(teacher));
 
   if (exportCsv) {
     const csv = toCsv(
-      ["الاسم", "المادة", "الهاتف", "السنة/المستوى", "نسبة الإدارة", "نسبة الأستاذ", "الحالة"],
-      teachers.map((t) => [
-        t.name,
-        t.subject,
-        t.phone,
-        t.teachingLevel,
-        t.adminShare !== undefined ? `${t.adminShare}%` : "",
-        t.teacherShare !== undefined ? `${t.teacherShare}%` : "",
-        t.isActive ? "نشط" : "موقوف",
+      ["الاسم", "المواد", "الهاتف", "المستويات", "الأقسام", "نوع التوظيف", "نوع الراتب", "نسبة الإدارة", "نسبة الأستاذ", "الحالة"],
+      teachers.map((teacher) => [
+        teacher.name,
+        teacher.subjects.join("، "),
+        teacher.phone,
+        teacher.academicLevels.join("، "),
+        teacher.assignedClasses.join("، "),
+        teacher.employmentType,
+        teacher.salaryConfig?.type ?? "",
+        teacher.adminShare !== undefined ? `${teacher.adminShare}%` : "",
+        teacher.teacherShare !== undefined ? `${teacher.teacherShare}%` : "",
+        teacher.status,
       ])
     );
     return csvResponse("teachers-report.csv", csv);
@@ -164,19 +178,19 @@ async function reportCourses(
     Course.countDocuments(filter),
   ]);
 
-  const courses = rows.map((c) => formatCourse(c));
+  const courses = rows.map((course) => formatCourse(course));
 
   if (exportCsv) {
     const csv = toCsv(
       ["الدورة", "الأستاذ", "القسم", "السعر", "المقاعد", "المتبقي", "الحالة"],
-      courses.map((c) => [
-        c.title,
-        (c.teacher as { name?: string })?.name ?? "",
-        c.department,
-        String(c.price),
-        String(c.seats),
-        String(c.remainingSeats),
-        c.isActive ? "نشطة" : "موقوفة",
+      courses.map((course) => [
+        course.title,
+        (course.teacher as { name?: string })?.name ?? "",
+        course.department,
+        String(course.price),
+        String(course.seats),
+        String(course.remainingSeats),
+        course.isActive ? "نشطة" : "موقوفة",
       ])
     );
     return csvResponse("courses-report.csv", csv);
@@ -210,17 +224,17 @@ async function reportEnrollments(
     Enrollment.countDocuments(filter),
   ]);
 
-  const enrollments = rows.map((e) => formatEnrollment(e));
+  const enrollments = rows.map((enrollment) => formatEnrollment(enrollment));
 
   if (exportCsv) {
     const csv = toCsv(
       ["الطالب", "الهاتف", "الدورة", "الحالة", "التاريخ"],
-      enrollments.map((e) => [
-        (e.student as { name?: string })?.name ?? "",
-        (e.student as { phone?: string })?.phone ?? "",
-        (e.course as { title?: string })?.title ?? "",
-        e.status,
-        new Date(e.createdAt).toLocaleDateString("ar-DZ"),
+      enrollments.map((enrollment) => [
+        (enrollment.student as { name?: string })?.name ?? "",
+        (enrollment.student as { phone?: string })?.phone ?? "",
+        (enrollment.course as { title?: string })?.title ?? "",
+        enrollment.status,
+        new Date(enrollment.createdAt).toLocaleDateString("ar-DZ"),
       ])
     );
     return csvResponse("enrollments-report.csv", csv);

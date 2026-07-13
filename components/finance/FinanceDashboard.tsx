@@ -13,10 +13,16 @@ import CashboxTab from "./CashboxTab";
 import LessonInvoicesTab from "./LessonInvoicesTab";
 import TeacherAccountTab from "./TeacherAccountTab";
 import NotificationsTab from "./NotificationsTab";
+import StudentFinanceTab from "./StudentFinanceTab";
+import PrivateLessonsTab from "./PrivateLessonsTab";
+import KindergartenTab from "./KindergartenTab";
 import type { UserRole } from "@/types";
 
 const TABS = [
   { id: "overview", label: "Overview", permission: "finance.view" },
+  { id: "private-lessons", label: "الحصص الخاصة", permission: "private_lessons.view" },
+  { id: "kindergarten", label: "الروضة", permission: "kindergarten.view" },
+  { id: "student-finance", label: "مالية الطلاب", permission: "student_finance.view" },
   { id: "cashbox", label: "الصندوق", permission: "finance.cash" },
   { id: "lesson-invoices", label: "الحصص والفواتير", permission: "finance.payments" },
   { id: "teacher-account", label: "حساب الأستاذ", permission: "finance.payouts" },
@@ -72,7 +78,10 @@ export default function FinanceDashboard() {
       </div>
 
       {activeTab === "overview" && <FinanceOverview />}
+      {activeTab === "private-lessons" && <PrivateLessonsTab />}
+      {activeTab === "kindergarten" && <KindergartenTab />}
       {activeTab === "cashbox" && <CashboxTab />}
+      {activeTab === "student-finance" && <StudentFinanceTab />}
       {activeTab === "lesson-invoices" && <LessonInvoicesTab />}
       {activeTab === "teacher-account" && <TeacherAccountTab />}
       {activeTab === "payments" && <PaymentsTab />}

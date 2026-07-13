@@ -65,6 +65,74 @@ export async function requireFinanceOwner() {
   return requirePermission("finance.owner");
 }
 
+export async function requireStudentFinanceView() {
+  return requirePermission("student_finance.view");
+}
+
+export async function requireStudentFinanceManage() {
+  return requirePermission("student_finance.manage");
+}
+
+export async function requireStudentFinancePayment() {
+  return requirePermission("student_finance.payments");
+}
+
+export async function requireStudentFinanceDiscount() {
+  return requirePermission("student_finance.discounts");
+}
+
+export async function requireStudentFinanceRefund() {
+  return requirePermission("student_finance.refunds");
+}
+
+export async function requireStudentFinanceReports() {
+  return requirePermission("student_finance.reports");
+}
+
+export async function requirePrivateLessonsView() {
+  return requirePermission("private_lessons.view");
+}
+
+export async function requirePrivateLessonsManage() {
+  return requirePermission("private_lessons.manage");
+}
+
+export async function requirePrivateLessonsAttendance() {
+  return requirePermission("private_lessons.attendance");
+}
+
+export async function requirePrivateLessonsPricing() {
+  return requirePermission("private_lessons.pricing");
+}
+
+export async function requirePrivateLessonsCompensation() {
+  return requirePermission("private_lessons.compensation");
+}
+
+export async function requirePrivateLessonsFinance() {
+  return requirePermission("private_lessons.finance");
+}
+
+export async function requirePrivateLessonsReports() {
+  return requirePermission("private_lessons.reports");
+}
+
+export async function requireKindergartenView() {
+  return requirePermission("kindergarten.view");
+}
+
+export async function requireKindergartenManage() {
+  return requirePermission("kindergarten.manage");
+}
+
+export async function requireKindergartenPayment() {
+  return requirePermission("kindergarten.payments");
+}
+
+export async function requireKindergartenCorrection() {
+  return requirePermission("kindergarten.correct_payments");
+}
+
 export async function requireFinanceDelete() {
   const { user, error } = await requireAuth();
   if (error) return { user: null, error };
@@ -128,5 +196,5 @@ export function canModifyTargetUser(
   if (targetRole === "admin" && actorRole !== "admin") {
     return false;
   }
-  return hasPermission(actorRole, "students.manage");
+  return hasPermission(actorRole, "students.manage") || hasPermission(actorRole, "students.update");
 }

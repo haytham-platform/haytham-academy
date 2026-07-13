@@ -16,10 +16,10 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import { formatPrice, formatDate } from "@/lib/utils";
-import type { MockCourse } from "@/types/ui";
+import type { CourseDetailData } from "@/types/ui";
 
 interface CourseDetailClientProps {
-  course: MockCourse;
+  course: CourseDetailData;
 }
 
 export default function CourseDetailClient({ course }: CourseDetailClientProps) {

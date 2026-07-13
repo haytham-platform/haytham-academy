@@ -57,7 +57,11 @@ export async function getActiveCourses(limit?: number): Promise<CourseCardData[]
 
 export async function getActiveTeachers(limit?: number): Promise<TeacherCardData[]> {
   await connectDB();
-  let query = Teacher.find({ isActive: true }).sort({ createdAt: -1 });
+  let query = Teacher.find({
+    isActive: true,
+    deletedAt: null,
+    $or: [{ status: "active" }, { status: { $exists: false } }],
+  }).sort({ createdAt: -1 });
 
   if (limit) {
     query = query.limit(limit);
@@ -69,6 +73,8 @@ export async function getActiveTeachers(limit?: number): Promise<TeacherCardData
     name: t.name,
     subject: t.subject,
     teachingLevel: t.teachingLevel,
+    subjects: t.subjects?.length ? t.subjects : [t.subject],
+    academicLevels: t.academicLevels?.length ? t.academicLevels : [t.teachingLevel],
   }));
 }
 

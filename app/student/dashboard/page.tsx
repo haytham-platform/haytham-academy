@@ -10,7 +10,8 @@ import Badge from "@/components/ui/Badge";
 import StatusBadge from "@/components/ui/StatusBadge";
 import Button from "@/components/ui/Button";
 import StudentTransportWidget from "@/components/transport/StudentTransportWidget";
-import { mockNotifications } from "@/lib/mock-data";
+import { connectDB } from "@/lib/db";
+import Notification from "@/models/Notification";
 import type { EnrollmentStatus } from "@/types";
 
 export const metadata: Metadata = {
@@ -30,7 +31,17 @@ export default async function StudentDashboardPage() {
     /* empty */
   }
 
-  const unreadCount = mockNotifications.filter((n) => !n.read).length;
+  let unreadCount = 0;
+  try {
+    await connectDB();
+    unreadCount = await Notification.countDocuments({
+      domain: { $in: ["student", "system", "transport"] },
+      readBy: { $ne: user._id },
+      $or: [{ userId: user._id }, { audienceRoles: "student" }],
+    });
+  } catch {
+    unreadCount = 0;
+  }
 
   return (
     <div>

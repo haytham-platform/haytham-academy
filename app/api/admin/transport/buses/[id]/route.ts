@@ -59,7 +59,7 @@ export async function PUT(
     if (body.status !== undefined) updates.status = body.status;
     if (body.notes !== undefined) updates.notes = body.notes?.trim() || "";
 
-    const bus = await Bus.findOneAndUpdate({ _id: id, deletedAt: null }, updates, { new: true })
+    const bus = await Bus.findOneAndUpdate({ _id: id, deletedAt: null }, updates, { returnDocument: "after" })
       .populate("driverId", "name phone")
       .populate("routeId", "name description");
     if (!bus) return errorResponse("الحافلة غير موجودة", 404);
@@ -85,7 +85,7 @@ export async function DELETE(
     const bus = await Bus.findOneAndUpdate(
       { _id: id, deletedAt: null },
       { deletedAt: new Date(), status: "inactive" },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!bus) return errorResponse("الحافلة غير موجودة", 404);
 

@@ -11,7 +11,8 @@ import CourseCard from "@/components/courses/CourseCard";
 import TeacherCard from "@/components/teachers/TeacherCard";
 import NewsCard from "@/components/news/NewsCard";
 import { getCoursesForUI, getTeachersForUI } from "@/lib/data-ui";
-import { mockNews } from "@/lib/mock-data";
+import { getPublishedNews } from "@/lib/news";
+import { formatSettings, getAcademySettings } from "@/lib/settings";
 import { ACADEMY } from "@/lib/constants";
 
 export const dynamic = "force-dynamic";
@@ -24,15 +25,18 @@ const whyUs = [
 ];
 
 export default async function HomePage() {
-  const [courses, teachers] = await Promise.all([
+  const [courses, teachers, news, settingsDoc] = await Promise.all([
     getCoursesForUI(3),
     getTeachersForUI(3),
+    getPublishedNews(3),
+    getAcademySettings(),
   ]);
+  const settings = formatSettings(settingsDoc);
 
   return (
     <>
       <HeroSection />
-      <ServicesSection />
+      <ServicesSection services={settings.services} />
 
       <Section background="default">
         <Title
@@ -56,7 +60,7 @@ export default async function HomePage() {
         </div>
       </Section>
 
-      <StatsSection />
+      <StatsSection stats={settings.stats} />
 
       <Section background="white">
         <div className="mb-10 flex items-end justify-between">
@@ -94,7 +98,7 @@ export default async function HomePage() {
         )}
       </Section>
 
-      <TestimonialsSection />
+      <TestimonialsSection testimonials={settings.testimonials} />
 
       <Section background="white">
         <div className="mb-10 flex items-end justify-between">
@@ -103,11 +107,15 @@ export default async function HomePage() {
             عرض الكل <ArrowLeft className="h-4 w-4" />
           </Link>
         </div>
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {mockNews.slice(0, 3).map((item, i) => (
-            <NewsCard key={item._id} news={item} featured={i === 0} />
-          ))}
-        </div>
+        {news.length > 0 ? (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {news.map((item, i) => (
+              <NewsCard key={item._id} news={item} featured={i === 0} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-center text-muted">لا توجد أخبار منشورة حالياً</p>
+        )}
       </Section>
 
       <CtaSection />

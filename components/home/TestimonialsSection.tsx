@@ -4,9 +4,13 @@ import { Star, Quote } from "lucide-react";
 import Section from "@/components/ui/Section";
 import Title from "@/components/ui/Title";
 import Card from "@/components/ui/Card";
-import { mockTestimonials } from "@/lib/mock-data";
+import type { AcademyTestimonialData } from "@/types/ui";
 
-export default function TestimonialsSection() {
+export default function TestimonialsSection({
+  testimonials,
+}: {
+  testimonials: AcademyTestimonialData[];
+}) {
   return (
     <Section background="muted" id="testimonials">
       <Title
@@ -17,8 +21,8 @@ export default function TestimonialsSection() {
         className="mb-12"
       />
       <div className="grid gap-6 md:grid-cols-3">
-        {mockTestimonials.map((item) => (
-          <Card key={item._id} hover>
+        {testimonials.map((item) => (
+          <Card key={`${item.name}-${item.role}`} hover>
             <Quote className="mb-3 h-8 w-8 text-accent/60" aria-hidden="true" />
             <p className="text-sm leading-7 text-muted">{item.content}</p>
             <div className="mt-4 flex items-center gap-1">

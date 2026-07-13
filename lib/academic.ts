@@ -1,4 +1,20 @@
-import type { EnrollmentStatus, StudentGender, StudentStatus } from "@/types";
+import type {
+  EmergencyContact,
+  EnrollmentStatus,
+  StudentDocument,
+  StudentGender,
+  StudentStatus,
+  TeacherAttendanceRecord,
+  TeacherContract,
+  TeacherDocument,
+  TeacherEmploymentType,
+  TeacherMoneyRecord,
+  TeacherPerformanceRecord,
+  TeacherQualification,
+  TeacherSalaryConfig,
+  TeacherScheduleItem,
+  TeacherStatus,
+} from "@/types";
 
 export function notDeletedFilter(includeDeleted?: boolean) {
   if (includeDeleted) return {};
@@ -16,12 +32,17 @@ export function formatStudent(s: {
   dateOfBirth?: Date;
   guardianName?: string;
   guardianPhone?: string;
+  guardianRelationship?: string;
   address?: string;
   wilaya?: string;
   commune?: string;
+  academicLevel?: string;
+  className?: string;
   studyLevel?: string;
   institution?: string;
   notes?: string;
+  emergencyContacts?: EmergencyContact[];
+  documents?: StudentDocument[];
   deletedAt?: Date | null;
   createdAt: Date;
   updatedAt?: Date;
@@ -32,20 +53,106 @@ export function formatStudent(s: {
     phone: s.phone,
     role: s.role,
     isActive: s.isActive,
-    status: s.status ?? (s.isActive ? "active" : "inactive"),
+    status: s.status ?? (s.isActive ? "active" : "suspended"),
     gender: s.gender,
     dateOfBirth: s.dateOfBirth,
     guardianName: s.guardianName,
     guardianPhone: s.guardianPhone,
+    guardianRelationship: s.guardianRelationship,
     address: s.address,
     wilaya: s.wilaya,
     commune: s.commune,
+    academicLevel: s.academicLevel ?? s.studyLevel,
+    className: s.className,
     studyLevel: s.studyLevel,
     institution: s.institution,
     notes: s.notes ?? "",
+    emergencyContacts: s.emergencyContacts ?? [],
+    documents: s.documents ?? [],
     deletedAt: s.deletedAt,
     createdAt: s.createdAt,
     updatedAt: s.updatedAt,
+  };
+}
+
+function formatTeacherQualification(item: TeacherQualification): TeacherQualification {
+  return {
+    degree: item.degree,
+    institution: item.institution,
+    field: item.field,
+    year: item.year,
+  };
+}
+
+function formatTeacherScheduleItem(item: TeacherScheduleItem): TeacherScheduleItem {
+  return {
+    day: item.day,
+    startTime: item.startTime,
+    endTime: item.endTime,
+    className: item.className,
+    subject: item.subject,
+    room: item.room,
+  };
+}
+
+function formatTeacherAttendanceRecord(item: TeacherAttendanceRecord): TeacherAttendanceRecord {
+  return {
+    date: item.date,
+    status: item.status,
+    note: item.note,
+  };
+}
+
+function formatTeacherMoneyRecord(item: TeacherMoneyRecord): TeacherMoneyRecord {
+  return {
+    title: item.title,
+    amount: item.amount,
+    date: item.date,
+    note: item.note,
+  };
+}
+
+function formatTeacherSalaryConfig(config?: TeacherSalaryConfig): TeacherSalaryConfig {
+  return {
+    type: config?.type ?? "per_session",
+    baseSalary: config?.baseSalary,
+    hourlyRate: config?.hourlyRate,
+    sessionRate: config?.sessionRate,
+    currency: config?.currency ?? "DZD",
+    effectiveFrom: config?.effectiveFrom,
+  };
+}
+
+function formatTeacherContract(item: TeacherContract): TeacherContract {
+  return {
+    title: item.title,
+    type: item.type,
+    status: item.status,
+    startDate: item.startDate,
+    endDate: item.endDate,
+    url: item.url,
+    publicId: item.publicId,
+    uploadedAt: item.uploadedAt,
+  };
+}
+
+function formatTeacherDocument(item: TeacherDocument): TeacherDocument {
+  return {
+    title: item.title,
+    type: item.type,
+    url: item.url,
+    publicId: item.publicId,
+    uploadedAt: item.uploadedAt,
+  };
+}
+
+function formatTeacherPerformanceRecord(item: TeacherPerformanceRecord): TeacherPerformanceRecord {
+  return {
+    date: item.date,
+    title: item.title,
+    rating: item.rating,
+    note: item.note,
+    createdBy: item.createdBy,
   };
 }
 
@@ -55,14 +162,41 @@ export function formatTeacher(t: {
   subject: string;
   phone: string;
   teachingLevel?: string;
+  email?: string;
+  address?: string;
+  nationalId?: string;
+  emergencyPhone?: string;
+  hireDate?: Date;
+  employmentType?: TeacherEmploymentType;
+  status?: TeacherStatus;
+  qualifications?: TeacherQualification[];
+  subjects?: string[];
+  academicLevels?: string[];
+  assignedClasses?: string[];
+  weeklySchedule?: TeacherScheduleItem[];
+  attendance?: TeacherAttendanceRecord[];
+  salaryConfig?: TeacherSalaryConfig;
+  salaryHistory?: TeacherMoneyRecord[];
+  bonuses?: TeacherMoneyRecord[];
+  deductions?: TeacherMoneyRecord[];
+  contracts?: TeacherContract[];
+  documents?: TeacherDocument[];
+  notes?: string;
+  performanceRecords?: TeacherPerformanceRecord[];
   adminShare?: number;
   isActive: boolean;
   deletedAt?: Date | null;
   createdAt?: Date;
+  updatedAt?: Date;
 }) {
   const adminShare = t.adminShare;
   const teacherShare =
     adminShare !== undefined && adminShare !== null ? 100 - adminShare : undefined;
+  const subjects = t.subjects?.length ? t.subjects : [t.subject].filter(Boolean);
+  const academicLevels = t.academicLevels?.length
+    ? t.academicLevels
+    : [t.teachingLevel ?? ""].filter(Boolean);
+  const status = t.status ?? (t.isActive ? "active" : "suspended");
 
   return {
     _id: t._id.toString(),
@@ -70,11 +204,33 @@ export function formatTeacher(t: {
     subject: t.subject,
     phone: t.phone,
     teachingLevel: t.teachingLevel ?? "",
+    email: t.email ?? "",
+    address: t.address ?? "",
+    nationalId: t.nationalId ?? "",
+    emergencyPhone: t.emergencyPhone ?? "",
+    hireDate: t.hireDate,
+    employmentType: t.employmentType ?? "part_time",
+    status,
+    qualifications: (t.qualifications ?? []).map(formatTeacherQualification),
+    subjects,
+    academicLevels,
+    assignedClasses: t.assignedClasses ?? [],
+    weeklySchedule: (t.weeklySchedule ?? []).map(formatTeacherScheduleItem),
+    attendance: (t.attendance ?? []).map(formatTeacherAttendanceRecord),
+    salaryConfig: formatTeacherSalaryConfig(t.salaryConfig),
+    salaryHistory: (t.salaryHistory ?? []).map(formatTeacherMoneyRecord),
+    bonuses: (t.bonuses ?? []).map(formatTeacherMoneyRecord),
+    deductions: (t.deductions ?? []).map(formatTeacherMoneyRecord),
+    contracts: (t.contracts ?? []).map(formatTeacherContract),
+    documents: (t.documents ?? []).map(formatTeacherDocument),
+    notes: t.notes ?? "",
+    performanceRecords: (t.performanceRecords ?? []).map(formatTeacherPerformanceRecord),
     adminShare,
     teacherShare,
     isActive: t.isActive,
     deletedAt: t.deletedAt,
     createdAt: t.createdAt,
+    updatedAt: t.updatedAt,
   };
 }
 

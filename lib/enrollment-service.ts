@@ -13,7 +13,7 @@ export function normalizeEnrollmentStatus(
   status: string
 ): EnrollmentStatus | null {
   if (status === "accepted") return "approved";
-  if (["pending", "approved", "rejected", "cancelled"].includes(status)) {
+  if (["pending", "approved", "rejected", "cancelled", "suspended", "reactivated", "transferred", "completed", "archived"].includes(status)) {
     return status as EnrollmentStatus;
   }
   return null;

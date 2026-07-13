@@ -3,13 +3,17 @@ import Container from "@/components/ui/Container";
 import Breadcrumb from "@/components/ui/Breadcrumb";
 import Title from "@/components/ui/Title";
 import NewsCard from "@/components/news/NewsCard";
-import { mockNews } from "@/lib/mock-data";
+import { getPublishedNews } from "@/lib/news";
 
 export const metadata: Metadata = {
   title: "الأخبار",
 };
 
-export default function NewsPage() {
+export const dynamic = "force-dynamic";
+
+export default async function NewsPage() {
+  const news = await getPublishedNews();
+
   return (
     <div className="bg-background py-10 md:py-14">
       <Container>
@@ -20,11 +24,15 @@ export default function NewsPage() {
           subtitle="تابع مستجدات الأكاديمية وإنجازات طلابنا"
           className="mb-10"
         />
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {mockNews.map((item, i) => (
-            <NewsCard key={item._id} news={item} featured={i === 0} />
-          ))}
-        </div>
+        {news.length > 0 ? (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {news.map((item, i) => (
+              <NewsCard key={item._id} news={item} featured={i === 0} />
+            ))}
+          </div>
+        ) : (
+          <p className="text-center text-muted">لا توجد أخبار منشورة حالياً</p>
+        )}
       </Container>
     </div>
   );

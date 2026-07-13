@@ -42,7 +42,7 @@ export async function PUT(
     if (body.status !== undefined) updates.status = body.status;
     if (body.notes !== undefined) updates.notes = body.notes?.trim() || "";
 
-    const driver = await Driver.findOneAndUpdate({ _id: id, deletedAt: null }, updates, { new: true });
+    const driver = await Driver.findOneAndUpdate({ _id: id, deletedAt: null }, updates, { returnDocument: "after" });
     if (!driver) return errorResponse("السائق غير موجود", 404);
 
     return successResponse({ driver: formatDriver(driver) });
@@ -66,7 +66,7 @@ export async function DELETE(
     const driver = await Driver.findOneAndUpdate(
       { _id: id, deletedAt: null },
       { deletedAt: new Date(), status: "inactive" },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!driver) return errorResponse("السائق غير موجود", 404);
 

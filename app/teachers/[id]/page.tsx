@@ -9,73 +9,55 @@ import CourseCard from "@/components/courses/CourseCard";
 import { connectDB } from "@/lib/db";
 import Teacher from "@/models/Teacher";
 import Course from "@/models/Course";
-import {
-  getMockTeacherById,
-  getMockCoursesByTeacherId,
-} from "@/lib/mock-data";
 
 export const dynamic = "force-dynamic";
 
 async function getTeacherData(id: string) {
-  try {
-    await connectDB();
-    const teacher = await Teacher.findById(id).lean();
-    if (teacher) {
-      const courses = await Course.find({ teacher: id, isActive: true })
-        .populate("teacher", "name subject")
-        .lean();
-      return {
-        teacher: {
-          _id: teacher._id.toString(),
-          name: teacher.name,
-          subject: teacher.subject,
-          phone: teacher.phone,
-          teachingLevel: teacher.teachingLevel,
-          subjects: [teacher.subject],
-        },
-        courses: courses.map((c) => ({
-          _id: c._id.toString(),
-          title: c.title,
-          description: c.description,
-          price: c.price,
-          image: c.image,
-          level: c.level,
-          duration: c.duration,
-          startDate: c.startDate.toISOString(),
-          seats: c.seats,
-          teacher: {
-            _id: teacher._id.toString(),
-            name: teacher.name,
-            subject: teacher.subject,
-          },
-        })),
-      };
-    }
-  } catch {
-    /* fallback */
-  }
+  await connectDB();
+  const teacher = await Teacher.findOne({
+    _id: id,
+    isActive: true,
+    deletedAt: null,
+    $or: [{ status: "active" }, { status: { $exists: false } }],
+  }).lean();
+  if (!teacher) return null;
 
-  const mockTeacher = getMockTeacherById(id);
-  if (!mockTeacher) return null;
+  const courses = await Course.find({ teacher: id, isActive: true, deletedAt: null })
+    .populate("teacher", "name subject")
+    .lean();
 
-  const courses = getMockCoursesByTeacherId(id).map((c) => ({
-    _id: c._id,
-    title: c.title,
-    description: c.description,
-    price: c.price,
-    image: c.image,
-    level: c.level,
-    duration: c.duration,
-    startDate: c.startDate,
-    seats: c.seats,
+  const subjects = teacher.subjects?.length ? teacher.subjects : [teacher.subject];
+  const academicLevels = teacher.academicLevels?.length
+    ? teacher.academicLevels
+    : [teacher.teachingLevel];
+
+  return {
     teacher: {
-      _id: c.teacher._id,
-      name: c.teacher.name,
-      subject: c.teacher.subject,
+      _id: teacher._id.toString(),
+      name: teacher.name,
+      subject: teacher.subject,
+      phone: teacher.phone,
+      teachingLevel: teacher.teachingLevel,
+      subjects,
+      academicLevels,
     },
-  }));
-
-  return { teacher: mockTeacher, courses };
+    courses: courses.map((c) => ({
+      _id: c._id.toString(),
+      title: c.title,
+      description: c.description,
+      price: c.price,
+      image: c.image,
+      level: c.level,
+      duration: c.duration,
+      startDate: c.startDate.toISOString(),
+      seats: c.seats,
+      teacher: {
+        _id: teacher._id.toString(),
+        name: teacher.name,
+        subject: teacher.subject,
+      },
+    })),
+  };
 }
 
 export async function generateMetadata({
@@ -120,7 +102,7 @@ export default async function TeacherDetailPage({
             <div className="mt-6 space-y-3 border-t border-border pt-6 text-sm">
               <p className="flex items-center justify-center gap-2 text-muted">
                 <GraduationCap className="h-4 w-4 text-primary" />
-                {teacher.teachingLevel}
+                {teacher.academicLevels.join("، ")}
               </p>
               <p className="flex items-center justify-center gap-2 text-muted">
                 <Phone className="h-4 w-4 text-primary" />
@@ -129,16 +111,16 @@ export default async function TeacherDetailPage({
             </div>
 
             <div className="mt-4 flex flex-wrap justify-center gap-2">
-              {teacher.subjects.map((s) => (
-                <Badge key={s} variant="muted">{s}</Badge>
+              {teacher.subjects.map((subject) => (
+                <Badge key={subject} variant="muted">{subject}</Badge>
               ))}
             </div>
           </Card>
 
           <div className="lg:col-span-2">
             <Card>
-              <h2 className="text-xl font-bold">المستوى الدراسي</h2>
-              <p className="mt-4 leading-8 text-muted">{teacher.teachingLevel}</p>
+              <h2 className="text-xl font-bold">المستويات الدراسية</h2>
+              <p className="mt-4 leading-8 text-muted">{teacher.academicLevels.join("، ")}</p>
             </Card>
 
             <div className="mt-8">
@@ -153,7 +135,7 @@ export default async function TeacherDetailPage({
                   ))}
                 </div>
               ) : (
-                <p className="text-muted">لا توجد دورات حالياً</p>
+                <p className="text-muted">لا توجد دورات حاليا</p>
               )}
             </div>
           </div>

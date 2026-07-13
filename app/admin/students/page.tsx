@@ -21,6 +21,23 @@ interface StudentCourse {
   price: number;
   level?: string;
   enrollmentStatus?: string;
+  enrolledAt?: string;
+  updatedAt?: string;
+  note?: string;
+}
+
+interface StudentDocument {
+  title: string;
+  type: string;
+  url: string;
+  publicId?: string;
+  uploadedAt?: string;
+}
+
+interface EmergencyContact {
+  name: string;
+  phone: string;
+  relationship?: string;
 }
 
 interface Student {
@@ -31,18 +48,24 @@ interface Student {
   dateOfBirth?: string;
   guardianName?: string;
   guardianPhone?: string;
+  guardianRelationship?: string;
   address?: string;
   wilaya?: string;
   commune?: string;
+  academicLevel?: string;
+  className?: string;
   studyLevel?: string;
   institution?: string;
   notes?: string;
+  emergencyContacts?: EmergencyContact[];
+  documents?: StudentDocument[];
   status: StudentStatus;
   isActive: boolean;
   deletedAt?: string | null;
   createdAt: string;
   course?: StudentCourse | null;
   courses?: StudentCourse[];
+  enrollmentHistory?: StudentCourse[];
   totalAmount?: number;
   paidAmount?: number;
   balance?: number;
@@ -72,21 +95,28 @@ const emptyForm = {
   dateOfBirth: "",
   guardianName: "",
   guardianPhone: "",
+  guardianRelationship: "",
   address: "",
   wilaya: "",
   commune: "",
+  academicLevel: "",
+  className: "",
   studyLevel: "",
   institution: "",
   notes: "",
   status: "active" as StudentStatus,
   courseId: "",
   enrollmentStatus: "pending",
+  emergencyContactName: "",
+  emergencyContactPhone: "",
+  emergencyContactRelationship: "",
 };
 
-const statusLabels: Record<StudentStatus, string> = {
+const statusLabels: Partial<Record<StudentStatus, string>> = {
   active: "نشط",
-  inactive: "غير نشط",
-  pending: "قيد الانتظار",
+  suspended: "موقوف",
+  graduated: "متخرج",
+  archived: "مؤرشف",
 };
 
 const paymentLabels: Record<PaymentStatus, string> = {
@@ -106,7 +136,8 @@ function money(value = 0) {
 
 function statusVariant(status: StudentStatus) {
   if (status === "active") return "success";
-  if (status === "pending") return "warning";
+  if (status === "suspended") return "warning";
+  if (status === "archived") return "danger";
   return "muted";
 }
 
@@ -139,6 +170,10 @@ export default function AdminStudentsPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Student | null>(null);
+  const [documentFile, setDocumentFile] = useState<File | null>(null);
+  const [documentTitle, setDocumentTitle] = useState("");
+  const [documentType, setDocumentType] = useState("identity");
+  const [uploadingDocument, setUploadingDocument] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [validationErrors, setValidationErrors] = useState<ValidationErrorItem[]>([]);
@@ -226,15 +261,21 @@ export default function AdminStudentsPage() {
         : "",
       guardianName: student.guardianName || "",
       guardianPhone: student.guardianPhone || "",
+      guardianRelationship: student.guardianRelationship || "",
       address: student.address || "",
       wilaya: student.wilaya || "",
       commune: student.commune || "",
+      academicLevel: student.academicLevel || student.studyLevel || "",
+      className: student.className || "",
       studyLevel: student.studyLevel || "",
       institution: student.institution || "",
       notes: student.notes || "",
-      status: student.status || (student.isActive ? "active" : "inactive"),
+      status: student.status || (student.isActive ? "active" : "suspended"),
       courseId: student.course?._id || "",
       enrollmentStatus: "pending",
+      emergencyContactName: student.emergencyContacts?.[0]?.name || "",
+      emergencyContactPhone: student.emergencyContacts?.[0]?.phone || "",
+      emergencyContactRelationship: student.emergencyContacts?.[0]?.relationship || "",
     });
     setShowForm(true);
   }
@@ -253,6 +294,20 @@ export default function AdminStudentsPage() {
     const url = editingId ? `/api/admin/students/${editingId}` : "/api/admin/students";
     const method = editingId ? "PUT" : "POST";
     const body = { ...form };
+    const emergencyContacts =
+      form.emergencyContactName || form.emergencyContactPhone
+        ? [
+            {
+              name: form.emergencyContactName,
+              phone: form.emergencyContactPhone,
+              relationship: form.emergencyContactRelationship,
+            },
+          ]
+        : [];
+    Object.assign(body, { emergencyContacts });
+    delete (body as { emergencyContactName?: string }).emergencyContactName;
+    delete (body as { emergencyContactPhone?: string }).emergencyContactPhone;
+    delete (body as { emergencyContactRelationship?: string }).emergencyContactRelationship;
     if (editingId && !body.password) delete (body as { password?: string }).password;
     if (!body.courseId) delete (body as { courseId?: string }).courseId;
 
@@ -286,6 +341,48 @@ export default function AdminStudentsPage() {
     reload();
   }
 
+  async function uploadDocument() {
+    if (!selectedStudent || !documentFile || !documentTitle.trim()) return;
+    setUploadingDocument(true);
+    setError("");
+    const body = new FormData();
+    body.set("file", documentFile);
+    body.set("title", documentTitle);
+    body.set("type", documentType);
+    const res = await fetch(`/api/admin/students/${selectedStudent._id}/documents`, {
+      method: "POST",
+      body,
+    });
+    const data = await res.json();
+    setUploadingDocument(false);
+    if (!res.ok) {
+      setError(data.error || "حدث خطأ أثناء رفع الوثيقة");
+      return;
+    }
+    setDocumentFile(null);
+    setDocumentTitle("");
+    await openDetails(selectedStudent);
+    reload();
+  }
+
+  async function deleteDocument(document: StudentDocument) {
+    if (!selectedStudent) return;
+    const params = new URLSearchParams();
+    if (document.publicId) params.set("publicId", document.publicId);
+    else params.set("url", document.url);
+    const res = await fetch(
+      `/api/admin/students/${selectedStudent._id}/documents?${params}`,
+      { method: "DELETE" }
+    );
+    if (!res.ok) {
+      const data = await res.json();
+      setError(data.error || "حدث خطأ أثناء حذف الوثيقة");
+      return;
+    }
+    await openDetails(selectedStudent);
+    reload();
+  }
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
@@ -294,6 +391,11 @@ export default function AdminStudentsPage() {
       </div>
 
       {message && <p className="mb-4 text-sm text-green-600">{message}</p>}
+      {error && !showForm && (
+        <p className="mb-4 rounded-xl bg-red-50 p-3 text-sm text-red-700" role="alert">
+          {error}
+        </p>
+      )}
 
       <form
         onSubmit={(e) => {
@@ -322,8 +424,9 @@ export default function AdminStudentsPage() {
         >
           <option value="">كل الحالات</option>
           <option value="active">نشط</option>
-          <option value="inactive">غير نشط</option>
-          <option value="pending">قيد الانتظار</option>
+          <option value="suspended">موقوف</option>
+          <option value="graduated">متخرج</option>
+          <option value="archived">مؤرشف</option>
         </select>
         <select
           className="input-field"
@@ -402,8 +505,9 @@ export default function AdminStudentsPage() {
               <label className="mb-1 block text-xs text-muted">الحالة</label>
               <select className="input-field" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value as StudentStatus })}>
                 <option value="active">نشط</option>
-                <option value="inactive">غير نشط</option>
-                <option value="pending">قيد الانتظار</option>
+                <option value="suspended">موقوف</option>
+                <option value="graduated">متخرج</option>
+                <option value="archived">مؤرشف</option>
               </select>
             </div>
             <div>
@@ -422,6 +526,14 @@ export default function AdminStudentsPage() {
               <input className="input-field" value={form.studyLevel} onChange={(e) => setForm({ ...form, studyLevel: e.target.value })} />
             </div>
             <div>
+              <label className="mb-1 block text-xs text-muted">المستوى الأكاديمي</label>
+              <input className="input-field" value={form.academicLevel} onChange={(e) => setForm({ ...form, academicLevel: e.target.value })} />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted">القسم / الفوج</label>
+              <input className="input-field" value={form.className} onChange={(e) => setForm({ ...form, className: e.target.value })} />
+            </div>
+            <div>
               <label className="mb-1 block text-xs text-muted">الجنس</label>
               <select className="input-field" value={form.gender} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
                 <option value="">—</option>
@@ -432,6 +544,10 @@ export default function AdminStudentsPage() {
             <div>
               <label className="mb-1 block text-xs text-muted">اسم الولي</label>
               <input className="input-field" value={form.guardianName} onChange={(e) => setForm({ ...form, guardianName: e.target.value })} />
+            </div>
+            <div>
+              <label className="mb-1 block text-xs text-muted">صلة الولي</label>
+              <input className="input-field" value={form.guardianRelationship} onChange={(e) => setForm({ ...form, guardianRelationship: e.target.value })} />
             </div>
             <div>
               <label className="mb-1 block text-xs text-muted">الولاية</label>
@@ -452,6 +568,14 @@ export default function AdminStudentsPage() {
             <div className="md:col-span-2">
               <label className="mb-1 block text-xs text-muted">ملاحظات</label>
               <textarea className="input-field" rows={2} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
+            </div>
+            <div className="rounded-2xl border border-border p-3 md:col-span-2 lg:col-span-3">
+              <p className="mb-3 text-sm font-bold">جهة اتصال للطوارئ</p>
+              <div className="grid gap-3 md:grid-cols-3">
+                <input className="input-field" placeholder="الاسم" value={form.emergencyContactName} onChange={(e) => setForm({ ...form, emergencyContactName: e.target.value })} />
+                <input className="input-field" placeholder="الهاتف" value={form.emergencyContactPhone} onChange={(e) => setForm({ ...form, emergencyContactPhone: e.target.value })} />
+                <input className="input-field" placeholder="صلة القرابة" value={form.emergencyContactRelationship} onChange={(e) => setForm({ ...form, emergencyContactRelationship: e.target.value })} />
+              </div>
             </div>
             {selectedCourse && (
               <div className="rounded-2xl border border-border p-3 text-sm">
@@ -474,7 +598,7 @@ export default function AdminStudentsPage() {
       ) : students.length > 0 ? (
         <>
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1100px] text-sm">
+            <table className="w-full min-w-[1200px] text-sm">
               <thead>
                 <tr className="border-b border-border text-right">
                   <th className="p-3">الطالب</th>
@@ -482,6 +606,7 @@ export default function AdminStudentsPage() {
                   <th className="p-3">هاتف الولي</th>
                   <th className="p-3">الدورة</th>
                   <th className="p-3">المستوى</th>
+                  <th className="p-3">القسم</th>
                   <th className="p-3">التسجيل</th>
                   <th className="p-3">الدفع</th>
                   <th className="p-3">الحالة</th>
@@ -498,7 +623,8 @@ export default function AdminStudentsPage() {
                     <td className="p-3">{student.phone || "—"}</td>
                     <td className="p-3">{student.guardianPhone || "—"}</td>
                     <td className="p-3">{student.course?.title || "—"}</td>
-                    <td className="p-3">{student.studyLevel || student.course?.level || "—"}</td>
+                    <td className="p-3">{student.academicLevel || student.studyLevel || student.course?.level || "—"}</td>
+                    <td className="p-3">{student.className || "—"}</td>
                     <td className="p-3">{formatDate(student.createdAt)}</td>
                     <td className="p-3">
                       <Badge variant={paymentVariant(student.paymentStatus)}>
@@ -553,20 +679,41 @@ export default function AdminStudentsPage() {
             </div>
             <div className="grid gap-3 md:grid-cols-2">
               <p><span className="text-muted">هاتف الولي:</span> {selectedStudent.guardianPhone || "—"}</p>
+              <p><span className="text-muted">اسم الولي:</span> {selectedStudent.guardianName || "—"}</p>
+              <p><span className="text-muted">صلة الولي:</span> {selectedStudent.guardianRelationship || "—"}</p>
               <p><span className="text-muted">تاريخ الميلاد:</span> {formatDate(selectedStudent.dateOfBirth)}</p>
               <p><span className="text-muted">العنوان:</span> {selectedStudent.address || "—"}</p>
-              <p><span className="text-muted">المستوى:</span> {selectedStudent.studyLevel || "—"}</p>
+              <p><span className="text-muted">المستوى الأكاديمي:</span> {selectedStudent.academicLevel || selectedStudent.studyLevel || "—"}</p>
+              <p><span className="text-muted">القسم / الفوج:</span> {selectedStudent.className || "—"}</p>
+              <p><span className="text-muted">المؤسسة:</span> {selectedStudent.institution || "—"}</p>
               <p><span className="text-muted">تاريخ التسجيل:</span> {formatDate(selectedStudent.createdAt)}</p>
               <p><span className="text-muted">الدفع:</span> {paymentLabels[selectedStudent.paymentStatus ?? "unpaid"]}</p>
             </div>
             <div>
-              <h4 className="mb-2 font-bold">الدورات</h4>
-              {(selectedStudent.courses ?? []).length > 0 ? (
+              <h4 className="mb-2 font-bold">جهات اتصال الطوارئ</h4>
+              {(selectedStudent.emergencyContacts ?? []).length > 0 ? (
+                <div className="grid gap-2 md:grid-cols-2">
+                  {selectedStudent.emergencyContacts!.map((contact) => (
+                    <div key={`${contact.name}-${contact.phone}`} className="rounded-2xl border border-border p-3">
+                      <p className="font-medium">{contact.name}</p>
+                      <p className="text-xs text-muted">{contact.phone} {contact.relationship ? `— ${contact.relationship}` : ""}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted">لا توجد جهات اتصال للطوارئ</p>
+              )}
+            </div>
+            <div>
+              <h4 className="mb-2 font-bold">سجل التسجيلات</h4>
+              {(selectedStudent.enrollmentHistory ?? selectedStudent.courses ?? []).length > 0 ? (
                 <div className="space-y-2">
-                  {selectedStudent.courses!.map((course) => (
+                  {(selectedStudent.enrollmentHistory ?? selectedStudent.courses ?? []).map((course) => (
                     <div key={course._id} className="rounded-2xl border border-border p-3">
                       <p className="font-medium">{course.title}</p>
-                      <p className="text-xs text-muted">{course.level || "—"} | {money(course.price)}</p>
+                      <p className="text-xs text-muted">
+                        {course.level || "—"} | {money(course.price)} | {course.enrollmentStatus || "—"} | {formatDate(course.enrolledAt)}
+                      </p>
                     </div>
                   ))}
                 </div>
@@ -577,6 +724,46 @@ export default function AdminStudentsPage() {
             <div>
               <h4 className="mb-2 font-bold">ملاحظات</h4>
               <p className="rounded-2xl border border-border p-3 text-muted">{selectedStudent.notes || "—"}</p>
+            </div>
+            <div>
+              <h4 className="mb-2 font-bold">الوثائق</h4>
+              {(selectedStudent.documents ?? []).length > 0 ? (
+                <div className="space-y-2">
+                  {selectedStudent.documents!.map((document) => (
+                    <div key={document.publicId || document.url} className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border p-3">
+                      <div>
+                        <a href={document.url} target="_blank" rel="noreferrer" className="font-medium text-primary hover:underline">
+                          {document.title}
+                        </a>
+                        <p className="text-xs text-muted">{document.type} | {formatDate(document.uploadedAt)}</p>
+                      </div>
+                      {canManage && (
+                        <button type="button" onClick={() => deleteDocument(document)} className="text-red-600 hover:underline">
+                          حذف
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted">لا توجد وثائق مرفوعة</p>
+              )}
+              {canManage && (
+                <div className="mt-3 grid gap-2 rounded-2xl border border-border p-3 md:grid-cols-4">
+                  <input className="input-field" placeholder="عنوان الوثيقة" value={documentTitle} onChange={(e) => setDocumentTitle(e.target.value)} />
+                  <select className="input-field" value={documentType} onChange={(e) => setDocumentType(e.target.value)}>
+                    <option value="identity">هوية</option>
+                    <option value="certificate">شهادة</option>
+                    <option value="guardian">وثيقة ولي</option>
+                    <option value="medical">طبية</option>
+                    <option value="other">أخرى</option>
+                  </select>
+                  <input className="input-field" type="file" onChange={(e) => setDocumentFile(e.target.files?.[0] ?? null)} />
+                  <Button type="button" loading={uploadingDocument} disabled={!documentFile || !documentTitle.trim()} onClick={uploadDocument}>
+                    رفع
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         )}

@@ -7,6 +7,7 @@ import Section from "@/components/ui/Section";
 import Card from "@/components/ui/Card";
 import { StatsSection } from "@/components/home/ServicesSection";
 import { ACADEMY } from "@/lib/constants";
+import { formatSettings, getAcademySettings } from "@/lib/settings";
 
 export const metadata: Metadata = {
   title: "من نحن",
@@ -19,7 +20,11 @@ const values = [
   { title: "التميز", description: "نسعى دائماً للتطور والابتكار", icon: BookOpen },
 ];
 
-export default function AboutPage() {
+export const dynamic = "force-dynamic";
+
+export default async function AboutPage() {
+  const settings = formatSettings(await getAcademySettings());
+
   return (
     <>
       <div className="gradient-hero py-16 text-white md:py-20">
@@ -52,11 +57,11 @@ export default function AboutPage() {
             </p>
           </div>
           <div className="grid grid-cols-2 gap-4">
-            {["1200+", "45+", "18+", "95%"].map((val, i) => (
-              <Card key={i} className="text-center">
-                <p className="text-2xl font-bold text-primary">{val}</p>
+            {settings.stats.map((stat) => (
+              <Card key={stat.label} className="text-center">
+                <p className="text-2xl font-bold text-primary">{stat.value}</p>
                 <p className="mt-1 text-xs text-muted">
-                  {["طالب", "دورة", "أستاذ", "نجاح"][i]}
+                  {stat.label}
                 </p>
               </Card>
             ))}
@@ -105,7 +110,7 @@ export default function AboutPage() {
         </div>
       </Section>
 
-      <StatsSection />
+      <StatsSection stats={settings.stats} />
     </>
   );
 }

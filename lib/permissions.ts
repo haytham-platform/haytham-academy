@@ -7,6 +7,24 @@ export type Permission =
   | "teachers.manage"
   | "students.view"
   | "students.manage"
+  | "students.create"
+  | "students.update"
+  | "students.archive"
+  | "students.restore"
+  | "students.export"
+  | "students.manage_guardians"
+  | "students.manage_enrollments"
+  | "students.manage_attendance"
+  | "students.manage_payments"
+  | "students.manage_documents"
+  | "students.manage_grades"
+  | "students.manage_behavior"
+  | "students.manage_medical"
+  | "students.manage_transportation"
+  | "students.manage_notes"
+  | "students.view_financial"
+  | "students.view_sensitive"
+  | "students.rollover"
   | "enrollments.view"
   | "enrollments.manage"
   | "messages.view"
@@ -20,6 +38,23 @@ export type Permission =
   | "finance.cash"
   | "finance.reports"
   | "finance.owner"
+  | "student_finance.view"
+  | "student_finance.manage"
+  | "student_finance.payments"
+  | "student_finance.discounts"
+  | "student_finance.refunds"
+  | "student_finance.reports"
+  | "private_lessons.view"
+  | "private_lessons.manage"
+  | "private_lessons.attendance"
+  | "private_lessons.pricing"
+  | "private_lessons.compensation"
+  | "private_lessons.finance"
+  | "private_lessons.reports"
+  | "kindergarten.view"
+  | "kindergarten.manage"
+  | "kindergarten.payments"
+  | "kindergarten.correct_payments"
   | "reports.view"
   | "transport.view"
   | "transport.manage"
@@ -33,6 +68,24 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "teachers.manage",
     "students.view",
     "students.manage",
+    "students.create",
+    "students.update",
+    "students.archive",
+    "students.restore",
+    "students.export",
+    "students.manage_guardians",
+    "students.manage_enrollments",
+    "students.manage_attendance",
+    "students.manage_payments",
+    "students.manage_documents",
+    "students.manage_grades",
+    "students.manage_behavior",
+    "students.manage_medical",
+    "students.manage_transportation",
+    "students.manage_notes",
+    "students.view_financial",
+    "students.view_sensitive",
+    "students.rollover",
     "enrollments.view",
     "enrollments.manage",
     "messages.view",
@@ -46,6 +99,23 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "finance.cash",
     "finance.reports",
     "finance.owner",
+    "student_finance.view",
+    "student_finance.manage",
+    "student_finance.payments",
+    "student_finance.discounts",
+    "student_finance.refunds",
+    "student_finance.reports",
+    "private_lessons.view",
+    "private_lessons.manage",
+    "private_lessons.attendance",
+    "private_lessons.pricing",
+    "private_lessons.compensation",
+    "private_lessons.finance",
+    "private_lessons.reports",
+    "kindergarten.view",
+    "kindergarten.manage",
+    "kindergarten.payments",
+    "kindergarten.correct_payments",
     "reports.view",
     "transport.view",
     "transport.manage",
@@ -57,6 +127,17 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "teachers.manage",
     "students.view",
     "students.manage",
+    "students.create",
+    "students.update",
+    "students.export",
+    "students.manage_guardians",
+    "students.manage_enrollments",
+    "students.manage_attendance",
+    "students.manage_payments",
+    "students.manage_documents",
+    "students.manage_transportation",
+    "students.manage_notes",
+    "students.view_financial",
     "enrollments.view",
     "enrollments.manage",
     "messages.view",
@@ -69,6 +150,17 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "finance.payouts",
     "finance.cash",
     "finance.reports",
+    "student_finance.view",
+    "student_finance.manage",
+    "student_finance.payments",
+    "student_finance.reports",
+    "private_lessons.view",
+    "private_lessons.manage",
+    "private_lessons.attendance",
+    "private_lessons.reports",
+    "kindergarten.view",
+    "kindergarten.manage",
+    "kindergarten.payments",
     "reports.view",
     "transport.view",
     "transport.manage",
@@ -77,6 +169,16 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
   secretary: [
     "admin.access",
     "students.view",
+    "students.create",
+    "students.update",
+    "students.manage_guardians",
+    "students.manage_enrollments",
+    "students.manage_attendance",
+    "students.manage_payments",
+    "students.manage_documents",
+    "students.manage_transportation",
+    "students.manage_notes",
+    "students.view_financial",
     "enrollments.view",
     "enrollments.manage",
     "messages.view",
@@ -84,6 +186,15 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "finance.payments",
     "finance.expenses",
     "finance.cash",
+    "student_finance.view",
+    "student_finance.payments",
+    "private_lessons.view",
+    "private_lessons.manage",
+    "private_lessons.attendance",
+    "private_lessons.finance",
+    "kindergarten.view",
+    "kindergarten.manage",
+    "kindergarten.payments",
     "reports.view",
     "transport.view",
     "transport.record",

@@ -42,7 +42,7 @@ export async function PUT(
     if (body.status !== undefined) updates.status = body.status;
     if (body.notes !== undefined) updates.notes = body.notes?.trim() || "";
 
-    const route = await Route.findOneAndUpdate({ _id: id, deletedAt: null }, updates, { new: true });
+    const route = await Route.findOneAndUpdate({ _id: id, deletedAt: null }, updates, { returnDocument: "after" });
     if (!route) return errorResponse("الخط غير موجود", 404);
 
     return successResponse({ route: formatRoute(route) });
@@ -66,7 +66,7 @@ export async function DELETE(
     const route = await Route.findOneAndUpdate(
       { _id: id, deletedAt: null },
       { deletedAt: new Date(), status: "inactive" },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!route) return errorResponse("الخط غير موجود", 404);
 

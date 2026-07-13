@@ -8,6 +8,7 @@ import { hashPassword } from "@/lib/auth";
 import { requirePermission } from "@/lib/auth-helpers";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { handleRouteError } from "@/lib/api-errors";
+import { recordAudit } from "@/lib/audit";
 import { formatStudent, notDeletedFilter } from "@/lib/academic";
 import {
   normalizeEnrollmentStatus,
@@ -18,40 +19,121 @@ import {
   parsePagination,
   parseSort,
 } from "@/lib/pagination";
-import type { StudentStatus } from "@/types";
+import {
+  STUDENT_STATUSES,
+  enrichStudentRecord,
+  generateStudentNumber,
+  studentUpdateFields,
+  upsertGuardians,
+} from "@/lib/students";
+import type { EmergencyContact, StudentDocument, StudentStatus } from "@/types";
 
 const ACTIVE_ENROLLMENT_STATUSES = ["pending", "approved", "accepted"] as never[];
-const STUDENT_STATUSES: StudentStatus[] = ["active", "inactive", "pending"];
 
 type StudentRecord = Parameters<typeof formatStudent>[0];
+
 interface StudentCourseSummary {
   _id: string;
   title: string;
   price: number;
   level: string;
   enrollmentStatus: string;
+  enrolledAt?: Date;
+  updatedAt?: Date;
 }
 
-function normalizeStudentStatus(
-  value: unknown,
-  fallback: StudentStatus
-): StudentStatus {
+function trim(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
+
+function normalizeStudentStatus(value: unknown, fallback: StudentStatus): StudentStatus {
   return typeof value === "string" && STUDENT_STATUSES.includes(value as StudentStatus)
     ? (value as StudentStatus)
     : fallback;
 }
 
-function statusToIsActive(status: StudentStatus) {
-  return status === "active";
+function sanitizeEmergencyContacts(value: unknown): EmergencyContact[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => ({
+      name: trim((item as EmergencyContact).name),
+      phone: trim((item as EmergencyContact).phone),
+      relationship: trim((item as EmergencyContact).relationship),
+    }))
+    .filter((item) => item.name && item.phone)
+    .slice(0, 5);
+}
+
+function sanitizeDocuments(value: unknown): StudentDocument[] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => ({
+      title: trim((item as StudentDocument).title),
+      type: trim((item as StudentDocument).type) || "other",
+      url: trim((item as StudentDocument).url),
+      publicId: trim((item as StudentDocument).publicId) || undefined,
+      uploadedAt: (item as StudentDocument).uploadedAt || new Date(),
+    }))
+    .filter((item) => item.title && item.url)
+    .slice(0, 20);
+}
+
+function validateStudentPayload(body: Record<string, unknown>, isCreate: boolean) {
+  const validationErrors: { field: string; message: string }[] = [];
+  if (!trim(body.name) && !trim(body.firstName)) validationErrors.push({ field: "name", message: "اسم الطالب مطلوب" });
+  if (!trim(body.phone)) validationErrors.push({ field: "phone", message: "رقم الهاتف مطلوب" });
+  if (isCreate && !trim(body.password)) {
+    validationErrors.push({ field: "password", message: "كلمة المرور مطلوبة" });
+  }
+  if (trim(body.password) && trim(body.password).length < 6) {
+    validationErrors.push({
+      field: "password",
+      message: "كلمة المرور يجب أن تكون 6 أحرف على الأقل",
+    });
+  }
+  if (body.status && !STUDENT_STATUSES.includes(body.status as StudentStatus)) {
+    validationErrors.push({ field: "status", message: "حالة الطالب غير صالحة" });
+  }
+  if (
+    Array.isArray(body.emergencyContacts) &&
+    body.emergencyContacts.length !== sanitizeEmergencyContacts(body.emergencyContacts).length
+  ) {
+    validationErrors.push({
+      field: "emergencyContacts",
+      message: "كل جهة طوارئ يجب أن تحتوي على الاسم والهاتف",
+    });
+  }
+  if (Array.isArray(body.documents) && body.documents.length !== sanitizeDocuments(body.documents).length) {
+    validationErrors.push({
+      field: "documents",
+      message: "كل وثيقة يجب أن تحتوي على العنوان والرابط",
+    });
+  }
+  return validationErrors;
+}
+
+function validationResponse(validationErrors: { field: string; message: string }[]) {
+  return Response.json(
+    { error: "بيانات الطالب غير مكتملة", validationErrors },
+    { status: 400 }
+  );
 }
 
 function buildStudentFilter(searchParams: URLSearchParams) {
   const search = searchParams.get("search")?.trim();
+  const studentNumber = searchParams.get("studentNumber")?.trim();
   const gender = searchParams.get("gender");
   const wilaya = searchParams.get("wilaya")?.trim();
+  const municipality = searchParams.get("municipality")?.trim();
   const studyLevel = searchParams.get("studyLevel")?.trim();
+  const academicLevel = searchParams.get("academicLevel")?.trim();
+  const academicSeason = searchParams.get("academicSeason")?.trim();
+  const className = searchParams.get("className")?.trim();
+  const enrollmentType = searchParams.get("enrollmentType")?.trim();
   const status = searchParams.get("status");
   const isActive = searchParams.get("isActive");
+  const registrationFrom = searchParams.get("registrationFrom");
+  const registrationTo = searchParams.get("registrationTo");
   const deletedOnly = searchParams.get("deletedOnly") === "true";
   const includeDeleted = searchParams.get("includeDeleted") === "true";
 
@@ -59,32 +141,47 @@ function buildStudentFilter(searchParams: URLSearchParams) {
     role: "student",
     ...(deletedOnly ? { deletedAt: { $ne: null } } : notDeletedFilter(includeDeleted)),
   };
-  const andFilters: object[] = [];
 
   if (search) {
     filter.$or = [
       { name: { $regex: search, $options: "i" } },
+      { firstName: { $regex: search, $options: "i" } },
+      { lastName: { $regex: search, $options: "i" } },
+      { studentNumber: { $regex: search, $options: "i" } },
       { phone: { $regex: search, $options: "i" } },
+      { secondaryPhone: { $regex: search, $options: "i" } },
+      { guardianName: { $regex: search, $options: "i" } },
       { guardianPhone: { $regex: search, $options: "i" } },
+      { academicLevel: { $regex: search, $options: "i" } },
+      { className: { $regex: search, $options: "i" } },
+      { studyLevel: { $regex: search, $options: "i" } },
+      { institution: { $regex: search, $options: "i" } },
     ];
   }
+  if (studentNumber) filter.studentNumber = { $regex: studentNumber, $options: "i" };
   if (gender === "male" || gender === "female") filter.gender = gender;
   if (wilaya) filter.wilaya = { $regex: wilaya, $options: "i" };
+  if (municipality) filter.municipality = { $regex: municipality, $options: "i" };
   if (studyLevel) filter.studyLevel = { $regex: studyLevel, $options: "i" };
-  if (status === "pending") filter.status = "pending";
-  if (status === "active") {
-    andFilters.push({
-      $or: [{ status: "active" }, { status: { $exists: false }, isActive: true }],
-    });
-  }
-  if (status === "inactive") {
-    andFilters.push({
-      $or: [{ status: "inactive" }, { isActive: false }],
-    });
-  }
+  if (academicLevel) filter.academicLevel = { $regex: academicLevel, $options: "i" };
+  if (academicSeason) filter.academicSeason = { $regex: academicSeason, $options: "i" };
+  if (className) filter.className = { $regex: className, $options: "i" };
+  if (enrollmentType) filter.enrollmentType = enrollmentType;
+  if (status && STUDENT_STATUSES.includes(status as StudentStatus)) filter.status = status;
   if (isActive === "true") filter.isActive = true;
   if (isActive === "false") filter.isActive = false;
-  if (andFilters.length > 0) filter.$and = andFilters;
+  if (registrationFrom || registrationTo) {
+    const range: Record<string, Date> = {};
+    if (registrationFrom) {
+      const from = new Date(registrationFrom);
+      if (!Number.isNaN(from.getTime())) range.$gte = from;
+    }
+    if (registrationTo) {
+      const to = new Date(registrationTo);
+      if (!Number.isNaN(to.getTime())) range.$lte = to;
+    }
+    if (Object.keys(range).length) filter.registrationDate = range;
+  }
 
   return filter;
 }
@@ -126,10 +223,7 @@ async function enrichStudents(students: StudentRecord[]) {
     .map((id) => new mongoose.Types.ObjectId(id));
 
   const [enrollments, payments] = await Promise.all([
-    Enrollment.find({
-      student: { $in: objectIds },
-      status: { $in: ACTIVE_ENROLLMENT_STATUSES },
-    })
+    Enrollment.find({ student: { $in: objectIds } })
       .populate("course", "title price level")
       .sort({ createdAt: -1 })
       .lean(),
@@ -158,9 +252,13 @@ async function enrichStudents(students: StudentRecord[]) {
       price: course.price ?? 0,
       level: course.level ?? "",
       enrollmentStatus: enrollment.status,
+      enrolledAt: enrollment.createdAt,
+      updatedAt: enrollment.updatedAt,
     });
     coursesByStudent.set(studentId, courses);
-    totalsByStudent.set(studentId, (totalsByStudent.get(studentId) ?? 0) + (course.price ?? 0));
+    if (ACTIVE_ENROLLMENT_STATUSES.includes(enrollment.status as never)) {
+      totalsByStudent.set(studentId, (totalsByStudent.get(studentId) ?? 0) + (course.price ?? 0));
+    }
   }
 
   const paidByStudent = new Map(
@@ -182,7 +280,10 @@ async function enrichStudents(students: StudentRecord[]) {
     return {
       ...formatStudent(student),
       courses,
-      course: courses[0] ?? null,
+      enrollmentHistory: courses,
+      course: courses.find((course) =>
+        ACTIVE_ENROLLMENT_STATUSES.includes(course.enrollmentStatus as never)
+      ) ?? courses[0] ?? null,
       totalAmount,
       paidAmount,
       balance: Math.max(0, totalAmount - paidAmount),
@@ -198,7 +299,11 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const pagination = parsePagination(searchParams);
-    const sort = parseSort(searchParams, ["name", "createdAt", "wilaya"], "createdAt");
+    const sort = parseSort(
+      searchParams,
+      ["name", "studentNumber", "registrationDate", "createdAt", "wilaya", "academicLevel", "className", "status"],
+      "createdAt"
+    );
     const filter = buildStudentFilter(searchParams);
     const paymentStatus = searchParams.get("paymentStatus");
 
@@ -243,25 +348,21 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { error } = await requirePermission("students.manage");
+    const { user, error } = await requirePermission("students.create");
     if (error) return error;
 
     const body = await request.json();
-    if (!body.name?.trim()) return errorResponse("الاسم مطلوب");
-    if (!body.phone?.trim()) return errorResponse("رقم الهاتف مطلوب");
+    const validationErrors = validateStudentPayload(body, true);
+    if (validationErrors.length) return validationResponse(validationErrors);
 
-    const password = body.password?.trim() || "Student123";
     const status = normalizeStudentStatus(
       body.status,
-      body.isActive === false ? "inactive" : "active"
+      body.isActive === false ? "suspended" : "active"
     );
-    if (password.length < 6) {
-      return errorResponse("كلمة المرور يجب أن تكون 6 أحرف على الأقل");
-    }
 
     await connectDB();
 
-    const exists = await User.findOne({ phone: body.phone.trim() });
+    const exists = await User.findOne({ phone: trim(body.phone) });
     if (exists) return errorResponse("رقم الهاتف مسجل مسبقا", 409);
 
     if (body.courseId) {
@@ -276,24 +377,32 @@ export async function POST(request: Request) {
       if (!course) return errorResponse("الدورة غير موجودة", 404);
     }
 
+    const baseStudentFields = studentUpdateFields(body);
+    const guardianPayload = Array.isArray(body.guardians)
+      ? body.guardians
+      : body.guardianName || body.guardianPhone
+        ? [
+            {
+              fullName: body.guardianName,
+              primaryPhone: body.guardianPhone,
+              relationship: body.guardianRelationship,
+              isPrimary: true,
+              financiallyResponsible: true,
+              authorizedPickup: true,
+            },
+          ]
+        : [];
+
     const student = await User.create({
-      name: body.name.trim(),
-      phone: body.phone.trim(),
-      password: await hashPassword(password),
+      ...baseStudentFields,
+      studentNumber: trim(body.studentNumber) || await generateStudentNumber(),
+      password: await hashPassword(trim(body.password)),
       role: "student",
-      status,
-      isActive: statusToIsActive(status),
-      gender: body.gender === "male" || body.gender === "female" ? body.gender : undefined,
-      dateOfBirth: body.dateOfBirth ? new Date(body.dateOfBirth) : undefined,
-      guardianName: body.guardianName?.trim(),
-      guardianPhone: body.guardianPhone?.trim(),
-      address: body.address?.trim(),
-      wilaya: body.wilaya?.trim(),
-      commune: body.commune?.trim(),
-      studyLevel: body.studyLevel?.trim(),
-      institution: body.institution?.trim(),
-      notes: body.notes?.trim() || "",
+      emergencyContacts: sanitizeEmergencyContacts(body.emergencyContacts),
+      documents: sanitizeDocuments(body.documents),
     });
+
+    await upsertGuardians(student._id.toString(), guardianPayload, user!._id);
 
     if (body.courseId) {
       const enrollmentStatus = normalizeEnrollmentStatus(body.enrollmentStatus || "pending");
@@ -304,11 +413,30 @@ export async function POST(request: Request) {
         student: student._id,
         course: body.courseId,
         status: enrollmentStatus,
+        academicSeason: trim(body.academicSeason),
+        academicLevel: trim(body.academicLevel) || trim(body.studyLevel),
+        className: trim(body.className),
+        enrollmentType: trim(body.enrollmentType),
+        registrationFee: Number(body.registrationFee) || 0,
+        tuitionFee: Number(body.tuitionFee) || 0,
+        discount: Number(body.discount) || 0,
+        finalPrice: Number(body.finalPrice) || 0,
+        paymentPlan: trim(body.paymentPlan),
+        startDate: body.enrollmentStartDate ? new Date(body.enrollmentStartDate) : undefined,
+        endDate: body.enrollmentEndDate ? new Date(body.enrollmentEndDate) : undefined,
+        createdBy: user!._id,
       });
     }
 
-    const [enrichedStudent] = await enrichStudents([student.toObject()]);
-    return successResponse({ student: enrichedStudent }, 201);
+    await recordAudit({
+      userId: user!._id,
+      action: "student.create",
+      recordType: "student",
+      recordId: student._id.toString(),
+      metadata: { status, courseId: body.courseId || null },
+    });
+
+    return successResponse({ student: await enrichStudentRecord(student.toObject()) }, 201);
   } catch (err) {
     return handleRouteError("Admin students POST", err);
   }

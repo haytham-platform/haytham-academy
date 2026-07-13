@@ -3,91 +3,66 @@ import { connectDB } from "@/lib/db";
 import User from "@/models/User";
 import Course from "@/models/Course";
 import Enrollment from "@/models/Enrollment";
-import Payment from "@/models/Payment";
 import { requirePermission, canModifyTargetUser } from "@/lib/auth-helpers";
 import { successResponse, errorResponse } from "@/lib/api-response";
 import { handleRouteError } from "@/lib/api-errors";
+import { recordAudit } from "@/lib/audit";
 import { hashPassword } from "@/lib/auth";
-import { formatStudent } from "@/lib/academic";
 import {
   normalizeEnrollmentStatus,
   onEnrollmentCreated,
 } from "@/lib/enrollment-service";
-import type { StudentStatus, UserRole } from "@/types";
+import {
+  STUDENT_STATUSES,
+  enrichStudentRecord,
+  listStudentRelatedRecords,
+  studentUpdateFields,
+  upsertGuardians,
+} from "@/lib/students";
+import type { EmergencyContact, StudentDocument, StudentStatus, UserRole } from "@/types";
 
-const ACTIVE_ENROLLMENT_STATUSES = ["pending", "approved", "accepted"] as never[];
-const STUDENT_STATUSES: StudentStatus[] = ["active", "inactive", "pending"];
+type StudentRecord = Parameters<typeof enrichStudentRecord>[0];
 
-type StudentRecord = Parameters<typeof formatStudent>[0];
+function trim(value: unknown) {
+  return typeof value === "string" ? value.trim() : "";
+}
 
-function normalizeStudentStatus(
-  value: unknown,
-  fallback: StudentStatus
-): StudentStatus {
+function normalizeStudentStatus(value: unknown, fallback: StudentStatus): StudentStatus {
   return typeof value === "string" && STUDENT_STATUSES.includes(value as StudentStatus)
     ? (value as StudentStatus)
     : fallback;
 }
 
 function statusToIsActive(status: StudentStatus) {
-  return status === "active";
+  return status === "active" || status === "pending";
 }
 
-async function enrichStudent(student: StudentRecord) {
-  const studentId = student._id.toString();
-  const objectId = new mongoose.Types.ObjectId(studentId);
+function sanitizeEmergencyContacts(value: unknown): EmergencyContact[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => ({
+      name: trim((item as EmergencyContact).name),
+      phone: trim((item as EmergencyContact).phone),
+      relationship: trim((item as EmergencyContact).relationship),
+    }))
+    .filter((item) => item.name && item.phone)
+    .slice(0, 5);
+}
 
-  const [enrollments, payments] = await Promise.all([
-    Enrollment.find({
-      student: objectId,
-      status: { $in: ACTIVE_ENROLLMENT_STATUSES },
-    })
-      .populate("course", "title price level")
-      .sort({ createdAt: -1 })
-      .lean(),
-    Payment.aggregate([
-      { $match: { studentId: objectId } },
-      { $group: { _id: "$studentId", totalPaid: { $sum: "$amount" } } },
-    ]),
-  ]);
-
-  const courses = enrollments
-    .map((enrollment) => {
-      const course = enrollment.course as {
-        _id?: { toString(): string };
-        title?: string;
-        price?: number;
-        level?: string;
-      } | null;
-      if (!course?._id) return null;
-      return {
-        _id: course._id.toString(),
-        title: course.title ?? "",
-        price: course.price ?? 0,
-        level: course.level ?? "",
-        enrollmentStatus: enrollment.status,
-      };
-    })
-    .filter(Boolean);
-
-  const totalAmount = courses.reduce((sum, course) => sum + (course?.price ?? 0), 0);
-  const paidAmount = Number(payments[0]?.totalPaid) || 0;
-  const paymentStatus =
-    totalAmount > 0 && paidAmount >= totalAmount
-      ? "paid"
-      : paidAmount > 0
-        ? "partial"
-        : "unpaid";
-
-  return {
-    ...formatStudent(student),
-    courses,
-    course: courses[0] ?? null,
-    totalAmount,
-    paidAmount,
-    balance: Math.max(0, totalAmount - paidAmount),
-    paymentStatus,
-  };
+function sanitizeDocuments(value: unknown): StudentDocument[] | undefined {
+  if (value === undefined) return undefined;
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((item) => ({
+      title: trim((item as StudentDocument).title),
+      type: trim((item as StudentDocument).type) || "other",
+      url: trim((item as StudentDocument).url),
+      publicId: trim((item as StudentDocument).publicId) || undefined,
+      uploadedAt: (item as StudentDocument).uploadedAt || new Date(),
+    }))
+    .filter((item) => item.title && item.url)
+    .slice(0, 20);
 }
 
 export async function GET(
@@ -106,7 +81,11 @@ export async function GET(
       .lean();
     if (!student) return errorResponse("الطالب غير موجود", 404);
 
-    return successResponse({ student: await enrichStudent(student as StudentRecord) });
+    const [studentRecord, relatedRecords] = await Promise.all([
+      enrichStudentRecord(student as StudentRecord),
+      listStudentRelatedRecords(id),
+    ]);
+    return successResponse({ student: { ...studentRecord, ...relatedRecords } });
   } catch (err) {
     console.error("Admin student GET:", err);
     return errorResponse("حدث خطأ", 500);
@@ -118,7 +97,7 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { user, error } = await requirePermission("students.manage");
+    const { user, error } = await requirePermission("students.update");
     if (error) return error;
 
     const { id } = await params;
@@ -128,61 +107,43 @@ export async function PUT(
 
     const target = await User.findById(id).select("+password");
     if (!target) return errorResponse("المستخدم غير موجود", 404);
-
     if (!canModifyTargetUser(user!.role, target.role as UserRole)) {
       return errorResponse("لا يمكنك تعديل هذا الحساب", 403);
     }
-    if (target.role !== "student") {
-      return errorResponse("الطالب غير موجود", 404);
+    if (target.role !== "student") return errorResponse("الطالب غير موجود", 404);
+
+    if (!trim(body.name) && !trim(body.firstName)) return errorResponse("اسم الطالب مطلوب");
+    if (!trim(body.phone)) return errorResponse("رقم الهاتف مطلوب");
+    if (body.status && !STUDENT_STATUSES.includes(body.status as StudentStatus)) {
+      return errorResponse("حالة الطالب غير صالحة");
     }
 
-    if (body.phone?.trim()) {
-      const duplicate = await User.findOne({
-        _id: { $ne: id },
-        phone: body.phone.trim(),
-      });
-      if (duplicate) return errorResponse("رقم الهاتف مسجل مسبقا", 409);
-    }
+    const duplicate = await User.findOne({
+      _id: { $ne: id },
+      phone: trim(body.phone),
+    });
+    if (duplicate) return errorResponse("رقم الهاتف مسجل مسبقا", 409);
 
     const currentStatus = normalizeStudentStatus(
       target.status,
-      target.isActive ? "active" : "inactive"
+      target.isActive ? "active" : "suspended"
     );
     const nextStatus = normalizeStudentStatus(
       body.status,
-      body.isActive === false ? "inactive" : currentStatus
+      body.isActive === false ? "suspended" : currentStatus
     );
 
     const updates: Record<string, unknown> = {
+      ...studentUpdateFields(body),
       status: nextStatus,
       isActive: statusToIsActive(nextStatus),
     };
-    const fields = [
-      "name",
-      "phone",
-      "gender",
-      "guardianName",
-      "guardianPhone",
-      "address",
-      "wilaya",
-      "commune",
-      "studyLevel",
-      "institution",
-      "notes",
-    ] as const;
+    if (body.studentNumber !== undefined) updates.studentNumber = trim(body.studentNumber);
+    const emergencyContacts = sanitizeEmergencyContacts(body.emergencyContacts);
+    if (emergencyContacts !== undefined) updates.emergencyContacts = emergencyContacts;
+    const documents = sanitizeDocuments(body.documents);
+    if (documents !== undefined) updates.documents = documents;
 
-    for (const field of fields) {
-      if (body[field] !== undefined) {
-        updates[field] =
-          typeof body[field] === "string" ? body[field].trim() : body[field];
-      }
-    }
-    if (body.gender !== undefined && body.gender !== "male" && body.gender !== "female") {
-      updates.gender = undefined;
-    }
-    if (body.dateOfBirth !== undefined) {
-      updates.dateOfBirth = body.dateOfBirth ? new Date(body.dateOfBirth) : null;
-    }
     if (body.password?.trim()) {
       if (body.password.trim().length < 6) {
         return errorResponse("كلمة المرور يجب أن تكون 6 أحرف على الأقل");
@@ -213,20 +174,55 @@ export async function PUT(
           student: id,
           course: body.courseId,
           status: enrollmentStatus,
+          academicSeason: trim(body.academicSeason),
+          academicLevel: trim(body.academicLevel) || trim(body.studyLevel),
+          className: trim(body.className),
+          enrollmentType: trim(body.enrollmentType),
+          registrationFee: Number(body.registrationFee) || 0,
+          tuitionFee: Number(body.tuitionFee) || 0,
+          discount: Number(body.discount) || 0,
+          finalPrice: Number(body.finalPrice) || 0,
+          paymentPlan: trim(body.paymentPlan),
+          startDate: body.enrollmentStartDate ? new Date(body.enrollmentStartDate) : undefined,
+          endDate: body.enrollmentEndDate ? new Date(body.enrollmentEndDate) : undefined,
           createdBy: user!._id,
         });
       }
     }
 
+    const guardianPayload = Array.isArray(body.guardians)
+      ? body.guardians
+      : body.guardianName || body.guardianPhone
+        ? [
+            {
+              fullName: body.guardianName,
+              primaryPhone: body.guardianPhone,
+              relationship: body.guardianRelationship,
+              isPrimary: true,
+              financiallyResponsible: true,
+              authorizedPickup: true,
+            },
+          ]
+        : [];
+    await upsertGuardians(id, guardianPayload, user!._id);
+
     const student = await User.findOneAndUpdate(
       { _id: id, role: "student" },
       updates,
-      { new: true }
+      { returnDocument: "after" }
     ).select("-password");
 
     if (!student) return errorResponse("الطالب غير موجود", 404);
 
-    return successResponse({ student: await enrichStudent(student.toObject()) });
+    await recordAudit({
+      userId: user!._id,
+      action: "student.update",
+      recordType: "student",
+      recordId: id,
+      metadata: { status: nextStatus, changedFields: Object.keys(updates) },
+    });
+
+    return successResponse({ student: await enrichStudentRecord(student.toObject()) });
   } catch (err) {
     return handleRouteError("Admin student PUT", err);
   }
@@ -237,29 +233,34 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const { user, error } = await requirePermission("students.manage");
+    const { user, error } = await requirePermission("students.archive");
     if (error) return error;
 
     const { id } = await params;
     await connectDB();
 
     const target = await User.findById(id);
-    if (!target || target.role !== "student") {
-      return errorResponse("الطالب غير موجود", 404);
-    }
+    if (!target || target.role !== "student") return errorResponse("الطالب غير موجود", 404);
     if (!canModifyTargetUser(user!.role, target.role as UserRole)) {
       return errorResponse("لا يمكنك حذف هذا الحساب", 403);
     }
 
     const student = await User.findOneAndUpdate(
       { _id: id, role: "student" },
-      { deletedAt: new Date(), isActive: false, status: "inactive" },
-      { new: true }
+      { deletedAt: new Date(), isActive: false, status: "archived" },
+      { returnDocument: "after" }
     ).select("-password");
 
+    await recordAudit({
+      userId: user!._id,
+      action: "student.archive",
+      recordType: "student",
+      recordId: id,
+    });
+
     return successResponse({
-      message: "تم حذف الطالب",
-      student: await enrichStudent(student!.toObject()),
+      message: "تم أرشفة الطالب",
+      student: await enrichStudentRecord(student!.toObject()),
     });
   } catch (err) {
     console.error("Admin student DELETE:", err);

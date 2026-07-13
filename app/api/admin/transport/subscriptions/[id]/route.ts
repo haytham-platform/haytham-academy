@@ -117,7 +117,7 @@ export async function DELETE(
     const subscription = await TransportSubscription.findByIdAndUpdate(
       id,
       { status: "expired", endDate: new Date() },
-      { new: true }
+      { returnDocument: "after" }
     );
     if (!subscription) return errorResponse("الاشتراك غير موجود", 404);
 

@@ -6,6 +6,8 @@ import Enrollment from "@/models/Enrollment";
 import ContactMessage from "@/models/ContactMessage";
 import { requirePermission } from "@/lib/auth-helpers";
 import { successResponse, errorResponse } from "@/lib/api-response";
+import { getStudentFinanceStats } from "@/lib/student-finance";
+import { getPrivateLessonStats } from "@/lib/private-lessons";
 
 function startOfMonth(date = new Date()) {
   return new Date(date.getFullYear(), date.getMonth(), 1);
@@ -26,8 +28,11 @@ export async function GET() {
       totalStudents,
       newStudentsThisMonth,
       activeStudents,
-      pendingStudents,
+      suspendedStudents,
       totalTeachers,
+      activeTeachers,
+      onLeaveTeachers,
+      suspendedTeachers,
       totalCourses,
       activeCourses,
       newEnrollmentsThisMonth,
@@ -37,12 +42,17 @@ export async function GET() {
       messagesCount,
       recentEnrollments,
       recentMessages,
+      studentFinanceStats,
+      privateLessonStats,
     ] = await Promise.all([
       User.countDocuments(studentBase),
       User.countDocuments({ ...studentBase, createdAt: { $gte: monthStart } }),
       User.countDocuments({ ...studentBase, isActive: true }),
-      User.countDocuments({ ...studentBase, status: "pending" }),
+      User.countDocuments({ ...studentBase, status: "suspended" }),
       Teacher.countDocuments({ deletedAt: null }),
+      Teacher.countDocuments({ deletedAt: null, status: "active" }),
+      Teacher.countDocuments({ deletedAt: null, status: "on_leave" }),
+      Teacher.countDocuments({ deletedAt: null, status: "suspended" }),
       Course.countDocuments({ deletedAt: null }),
       Course.countDocuments(activeCourseFilter),
       Enrollment.countDocuments({ createdAt: { $gte: monthStart } }),
@@ -97,6 +107,8 @@ export async function GET() {
         .limit(5)
         .lean(),
       ContactMessage.find().sort({ createdAt: -1 }).limit(5).lean(),
+      getStudentFinanceStats(),
+      getPrivateLessonStats(),
     ]);
 
     const topCourse = topCourseAgg[0]
@@ -120,8 +132,11 @@ export async function GET() {
         students: totalStudents,
         newStudentsThisMonth,
         activeStudents,
-        pendingStudents,
+        suspendedStudents,
         teachers: totalTeachers,
+        activeTeachers,
+        onLeaveTeachers,
+        suspendedTeachers,
         courses: totalCourses,
         activeCourses,
         newEnrollmentsThisMonth,
@@ -129,6 +144,8 @@ export async function GET() {
         messages: messagesCount,
         topCourse,
         topTeacher,
+        studentFinance: studentFinanceStats,
+        privateLessons: privateLessonStats,
       },
       recentEnrollments: recentEnrollments.map((e) => ({
         _id: e._id.toString(),

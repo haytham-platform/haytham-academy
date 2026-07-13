@@ -5,10 +5,10 @@ import { Calendar, User, ArrowLeft } from "lucide-react";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import { formatDate } from "@/lib/utils";
-import type { MockNews } from "@/types/ui";
+import type { NewsCardData } from "@/types/ui";
 
 interface NewsCardProps {
-  news: MockNews;
+  news: NewsCardData;
   featured?: boolean;
 }
 

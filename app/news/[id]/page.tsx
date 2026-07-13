@@ -5,12 +5,14 @@ import Container from "@/components/ui/Container";
 import Breadcrumb from "@/components/ui/Breadcrumb";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
-import { getMockNewsById } from "@/lib/mock-data";
+import { getPublishedNewsById } from "@/lib/news";
 import { formatDate } from "@/lib/utils";
 
 export const metadata: Metadata = {
   title: "تفاصيل الخبر",
 };
+
+export const dynamic = "force-dynamic";
 
 export default async function NewsDetailPage({
   params,
@@ -18,7 +20,7 @@ export default async function NewsDetailPage({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const news = getMockNewsById(id);
+  const news = await getPublishedNewsById(id);
   if (!news) notFound();
 
   return (

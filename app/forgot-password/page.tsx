@@ -10,10 +10,33 @@ import Button from "@/components/ui/Button";
 export default function ForgotPasswordPage() {
   const [phone, setPhone] = useState("");
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [resetUrl, setResetUrl] = useState("");
+  const [error, setError] = useState("");
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setSubmitted(true);
+    setLoading(true);
+    setError("");
+    setResetUrl("");
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "حدث خطأ");
+        return;
+      }
+      setResetUrl(data.resetUrl || "");
+      setSubmitted(true);
+    } catch {
+      setError("حدث خطأ أثناء إنشاء رابط إعادة التعيين");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
@@ -34,9 +57,17 @@ export default function ForgotPasswordPage() {
           <p className="mt-2 text-sm text-green-700">
             تحقق من رسائلك أو تواصل مع الإدارة إذا لم تستلم الرابط.
           </p>
+          {resetUrl && (
+            <Link href={resetUrl} className="mt-4 inline-block text-sm font-medium text-primary hover:underline">
+              فتح رابط إعادة التعيين
+            </Link>
+          )}
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
+          {error && (
+            <div className="rounded-xl bg-red-50 p-3 text-sm text-red-700" role="alert">{error}</div>
+          )}
           <Input
             label="رقم الهاتف"
             type="tel"
@@ -44,7 +75,7 @@ export default function ForgotPasswordPage() {
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
           />
-          <Button type="submit" fullWidth size="lg">
+          <Button type="submit" fullWidth size="lg" loading={loading}>
             إرسال رابط إعادة التعيين
           </Button>
         </form>

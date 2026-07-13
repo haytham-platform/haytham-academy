@@ -31,7 +31,7 @@ export async function PUT(
     const updated = await User.findByIdAndUpdate(
       id,
       { isActive: body.isActive },
-      { new: true }
+      { returnDocument: "after" }
     ).select("-password");
 
     if (!updated) return errorResponse("المستخدم غير موجود", 404);

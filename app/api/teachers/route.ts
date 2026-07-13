@@ -6,7 +6,11 @@ export async function GET() {
   try {
     await connectDB();
 
-    const teachers = await Teacher.find({ isActive: true })
+    const teachers = await Teacher.find({
+      isActive: true,
+      deletedAt: null,
+      $or: [{ status: "active" }, { status: { $exists: false } }],
+    })
       .sort({ createdAt: -1 })
       .lean();
 
@@ -16,6 +20,8 @@ export async function GET() {
       subject: teacher.subject,
       phone: teacher.phone,
       teachingLevel: teacher.teachingLevel,
+      subjects: teacher.subjects?.length ? teacher.subjects : [teacher.subject],
+      academicLevels: teacher.academicLevels?.length ? teacher.academicLevels : [teacher.teachingLevel],
     }));
 
     return successResponse({ teachers: formatted });

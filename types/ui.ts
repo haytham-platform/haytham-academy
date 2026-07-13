@@ -1,20 +1,3 @@
-export interface MockCourse {
-  _id: string;
-  title: string;
-  description: string;
-  price: number;
-  image: string;
-  level: string;
-  duration: string;
-  startDate: string;
-  seats: number;
-  teacher: {
-    _id: string;
-    name: string;
-    subject: string;
-  };
-}
-
 export interface CourseCardData {
   _id: string;
   title: string;
@@ -32,23 +15,24 @@ export interface CourseCardData {
   } | null;
 }
 
+export interface CourseDetailData extends CourseCardData {
+  teacher: {
+    _id: string;
+    name: string;
+    subject: string;
+  };
+}
+
 export interface TeacherCardData {
   _id: string;
   name: string;
   subject: string;
   teachingLevel: string;
+  subjects?: string[];
+  academicLevels?: string[];
 }
 
-export interface MockTeacher {
-  _id: string;
-  name: string;
-  subject: string;
-  phone: string;
-  teachingLevel: string;
-  subjects: string[];
-}
-
-export interface MockNews {
+export interface NewsCardData {
   _id: string;
   title: string;
   excerpt: string;
@@ -56,34 +40,26 @@ export interface MockNews {
   image: string;
   category: string;
   author: string;
+  isPublished?: boolean;
   publishedAt: string;
 }
 
-export interface MockTestimonial {
-  _id: string;
-  name: string;
-  role: string;
-  content: string;
-  rating: number;
-  avatar: string;
-}
-
-export interface MockStat {
-  label: string;
-  value: string;
-  icon: string;
-}
-
-export interface MockService {
+export interface AcademyServiceData {
   title: string;
   description: string;
   icon: string;
 }
 
-export interface MockNotification {
-  _id: string;
-  title: string;
-  message: string;
-  read: boolean;
-  createdAt: string;
+export interface AcademyStatData {
+  label: string;
+  value: string;
+  icon: string;
+}
+
+export interface AcademyTestimonialData {
+  name: string;
+  role: string;
+  content: string;
+  rating: number;
+  avatar?: string;
 }

@@ -76,7 +76,7 @@ export async function PUT(
       updates.remainingSeats = newSeats - occupied;
     }
 
-    const course = await Course.findByIdAndUpdate(id, updates, { new: true }).populate(
+    const course = await Course.findByIdAndUpdate(id, updates, { returnDocument: "after" }).populate(
       "teacher",
       "name subject"
     );
@@ -102,7 +102,7 @@ export async function DELETE(
     const course = await Course.findOneAndUpdate(
       { _id: id, deletedAt: null },
       { deletedAt: new Date(), isActive: false },
-      { new: true }
+      { returnDocument: "after" }
     ).populate("teacher", "name subject");
 
     if (!course) return errorResponse("الدورة غير موجودة", 404);

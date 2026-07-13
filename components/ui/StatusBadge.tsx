@@ -1,13 +1,13 @@
 import type { EnrollmentStatus } from "@/types";
 
-const statusLabels: Record<EnrollmentStatus, string> = {
+const statusLabels: Partial<Record<EnrollmentStatus, string>> = {
   pending: "قيد المراجعة",
   approved: "مقبول",
   rejected: "مرفوض",
   cancelled: "ملغى",
 };
 
-const statusClasses: Record<EnrollmentStatus, string> = {
+const statusClasses: Partial<Record<EnrollmentStatus, string>> = {
   pending: "badge-pending",
   approved: "badge-accepted",
   rejected: "badge-rejected",

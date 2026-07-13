@@ -27,10 +27,15 @@ function loadEnv() {
 loadEnv();
 
 const MONGODB_URI = process.env.MONGODB_URI;
-const STAFF_PASSWORD = "20020319AZEaze";
+const STAFF_PASSWORD = process.env.STAFF_PASSWORD;
 
 if (!MONGODB_URI) {
   console.error("MONGODB_URI is required in .env");
+  process.exit(1);
+}
+
+if (!STAFF_PASSWORD || STAFF_PASSWORD.length < 8) {
+  console.error("STAFF_PASSWORD is required in .env and must be at least 8 characters");
   process.exit(1);
 }
 
@@ -77,10 +82,7 @@ async function seed() {
     console.log(`Staff account created: ${account.name} (${account.role})`);
   }
 
-  await Teacher.deleteMany({});
-  await Course.deleteMany({});
-
-  const teachers = await Teacher.insertMany([
+  const teacherSeeds = [
     {
       name: "أستاذ أحمد بن علي",
       subject: "الرياضيات",
@@ -105,10 +107,20 @@ async function seed() {
       adminShare: 30,
       isActive: true,
     },
-  ]);
+  ];
+
+  const teachers = [];
+  for (const teacherSeed of teacherSeeds) {
+    const teacher = await Teacher.findOneAndUpdate(
+      { phone: teacherSeed.phone },
+      { $setOnInsert: teacherSeed },
+      { returnDocument: "after", upsert: true }
+    );
+    teachers.push(teacher);
+  }
   console.log(`Created ${teachers.length} teachers`);
 
-  const courses = await Course.insertMany([
+  const courseSeeds = [
     {
       title: "دورة الرياضيات - البكالوريا",
       description: "دورة شاملة لتحضير طلاب البكالوريا في مادة الرياضيات مع تمارين تطبيقية",
@@ -174,7 +186,17 @@ async function seed() {
       remainingSeats: 20,
       isActive: true,
     },
-  ]);
+  ];
+
+  const courses = [];
+  for (const courseSeed of courseSeeds) {
+    const course = await Course.findOneAndUpdate(
+      { title: courseSeed.title },
+      { $setOnInsert: courseSeed },
+      { returnDocument: "after", upsert: true }
+    );
+    courses.push(course);
+  }
   console.log(`Created ${courses.length} courses`);
 
   console.log("\nSeed completed successfully!");

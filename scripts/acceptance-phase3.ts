@@ -1,6 +1,6 @@
 /**
  * Phase 3 acceptance tests — AUTH + DB + SECURITY
- * Usage: npm run acceptance (requires dev server on BASE_URL)
+ * Usage: pnpm acceptance (requires dev server on BASE_URL)
  */
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
@@ -398,7 +398,7 @@ async function main() {
     await fetch(BASE);
   } catch {
     console.error("\nERROR: Dev server not reachable at", BASE);
-    console.error("Run: npm run dev");
+    console.error("Run: pnpm dev");
     process.exit(1);
   }
 

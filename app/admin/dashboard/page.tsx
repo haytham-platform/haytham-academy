@@ -8,7 +8,8 @@ import {
   UserPlus,
   Armchair,
   TrendingUp,
-  Clock,
+  CirclePause,
+  CalendarDays,
 } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth";
 import { isStaffRole } from "@/lib/permissions";
@@ -23,6 +24,8 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import StatusBadge from "@/components/ui/StatusBadge";
 import type { EnrollmentStatus } from "@/types";
+import { getStudentFinanceStats } from "@/lib/student-finance";
+import { getPrivateLessonStats } from "@/lib/private-lessons";
 
 export const metadata: Metadata = {
   title: "لوحة الإدارة",
@@ -48,8 +51,11 @@ export default async function AdminDashboardPage() {
     totalStudents,
     newStudentsThisMonth,
     activeStudents,
-    pendingStudents,
+    suspendedStudents,
     teachersCount,
+    activeTeachers,
+    onLeaveTeachers,
+    suspendedTeachers,
     coursesCount,
     activeCourses,
     newEnrollmentsThisMonth,
@@ -59,12 +65,17 @@ export default async function AdminDashboardPage() {
     messagesCount,
     recentEnrollments,
     recentMessages,
+    studentFinanceStats,
+    privateLessonStats,
   ] = await Promise.all([
     User.countDocuments(studentBase),
     User.countDocuments({ ...studentBase, createdAt: { $gte: monthStart } }),
     User.countDocuments({ ...studentBase, isActive: true }),
-    User.countDocuments({ ...studentBase, status: "pending" }),
+    User.countDocuments({ ...studentBase, status: "suspended" }),
     Teacher.countDocuments({ deletedAt: null }),
+    Teacher.countDocuments({ deletedAt: null, status: "active" }),
+    Teacher.countDocuments({ deletedAt: null, status: "on_leave" }),
+    Teacher.countDocuments({ deletedAt: null, status: "suspended" }),
     Course.countDocuments({ deletedAt: null }),
     Course.countDocuments(activeCourseFilter),
     Enrollment.countDocuments({ createdAt: { $gte: monthStart } }),
@@ -126,6 +137,8 @@ export default async function AdminDashboardPage() {
       .limit(5)
       .lean(),
     ContactMessage.find().sort({ createdAt: -1 }).limit(5).lean(),
+    getStudentFinanceStats(),
+    getPrivateLessonStats(),
   ]);
 
   const remainingSeats = remainingSeatsAgg[0]?.total ?? 0;
@@ -136,13 +149,20 @@ export default async function AdminDashboardPage() {
     { label: "إجمالي الطلاب", value: totalStudents, icon: Users, color: "bg-blue-500" },
     { label: "طلاب جدد (الشهر)", value: newStudentsThisMonth, icon: UserPlus, color: "bg-cyan-500" },
     { label: "الطلاب النشطون", value: activeStudents, icon: TrendingUp, color: "bg-emerald-500" },
-    { label: "طلاب قيد الانتظار", value: pendingStudents, icon: Clock, color: "bg-amber-500" },
+    { label: "طلاب موقوفون", value: suspendedStudents, icon: CirclePause, color: "bg-amber-500" },
     { label: "إجمالي الأساتذة", value: teachersCount, icon: GraduationCap, color: "bg-sky-500" },
+    { label: "أساتذة نشطون", value: activeTeachers, icon: GraduationCap, color: "bg-emerald-500" },
+    { label: "أساتذة في إجازة", value: onLeaveTeachers, icon: CirclePause, color: "bg-amber-500" },
+    { label: "أساتذة موقوفون", value: suspendedTeachers, icon: CirclePause, color: "bg-red-500" },
     { label: "إجمالي الدورات", value: coursesCount, icon: BookOpen, color: "bg-indigo-500" },
     { label: "الدورات النشطة", value: activeCourses, icon: BookOpen, color: "bg-violet-500" },
     { label: "تسجيلات جديدة", value: newEnrollmentsThisMonth, icon: UserPlus, color: "bg-pink-500" },
     { label: "المقاعد المتبقية", value: remainingSeats, icon: Armchair, color: "bg-amber-500" },
     { label: "الرسائل", value: messagesCount, icon: MessageSquare, color: "bg-orange-500" },
+    { label: "تحصيلات الطلاب", value: studentFinanceStats.totalCollectedAmount, icon: TrendingUp, color: "bg-emerald-500" },
+    { label: "ديون الطلاب", value: studentFinanceStats.totalOutstandingBalance, icon: CirclePause, color: "bg-red-500" },
+    { label: "الحصص الخاصة", value: privateLessonStats.totalPrivateLessons, icon: CalendarDays, color: "bg-fuchsia-500" },
+    { label: "إيراد الحصص الخاصة", value: privateLessonStats.totalPrivateLessonRevenue, icon: TrendingUp, color: "bg-green-600" },
   ];
 
   return (

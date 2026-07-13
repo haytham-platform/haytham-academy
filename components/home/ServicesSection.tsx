@@ -13,7 +13,7 @@ import {
 import Section from "@/components/ui/Section";
 import Title from "@/components/ui/Title";
 import Card from "@/components/ui/Card";
-import { mockServices, mockStats } from "@/lib/mock-data";
+import type { AcademyServiceData, AcademyStatData } from "@/types/ui";
 
 const iconMap: Record<string, React.ElementType> = {
   "graduation-cap": GraduationCap,
@@ -26,7 +26,7 @@ const iconMap: Record<string, React.ElementType> = {
   trophy: Trophy,
 };
 
-export function ServicesSection() {
+export function ServicesSection({ services }: { services: AcademyServiceData[] }) {
   return (
     <Section background="white" id="services">
       <Title
@@ -37,7 +37,7 @@ export function ServicesSection() {
         className="mb-12"
       />
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {mockServices.map((service) => {
+        {services.map((service) => {
           const Icon = iconMap[service.icon] || BookOpen;
           return (
             <Card key={service.title} hover className="text-center">
@@ -54,11 +54,11 @@ export function ServicesSection() {
   );
 }
 
-export function StatsSection() {
+export function StatsSection({ stats }: { stats: AcademyStatData[] }) {
   return (
     <Section background="primary" className="!py-14">
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        {mockStats.map((stat) => {
+        {stats.map((stat) => {
           const Icon = iconMap[stat.icon] || Trophy;
           return (
             <div key={stat.label} className="text-center">

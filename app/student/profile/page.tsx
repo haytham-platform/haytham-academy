@@ -4,8 +4,7 @@ import { getCurrentUser } from "@/lib/auth";
 import Title from "@/components/ui/Title";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
-import { Input } from "@/components/ui/Input";
-import Button from "@/components/ui/Button";
+import StudentProfileForm from "@/components/student/StudentProfileForm";
 
 export const metadata: Metadata = {
   title: "الملف الشخصي",
@@ -33,14 +32,7 @@ export default async function StudentProfilePage() {
             </div>
           </div>
 
-          <form className="space-y-4">
-            <Input label="الاسم الكامل" defaultValue={user.name} readOnly />
-            <Input label="رقم الهاتف" defaultValue={user.phone} readOnly />
-            <Input label="كلمة المرور الجديدة" type="password" placeholder="اتركه فارغاً إن لم ترد التغيير" />
-            <Button type="button" fullWidth disabled>
-              حفظ التغييرات (قريباً)
-            </Button>
-          </form>
+          <StudentProfileForm name={user.name} phone={user.phone} />
         </Card>
       </div>
     </div>

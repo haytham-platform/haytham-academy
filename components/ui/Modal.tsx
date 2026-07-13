@@ -11,13 +11,14 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: React.ReactNode;
-  size?: "sm" | "md" | "lg";
+  size?: "sm" | "md" | "lg" | "xl";
 }
 
 const sizes = {
   sm: "max-w-md",
   md: "max-w-lg",
   lg: "max-w-2xl",
+  xl: "max-w-[760px]",
 };
 
 export default function Modal({
@@ -70,7 +71,7 @@ export default function Modal({
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.95, y: 20 }}
             className={cn(
-              "relative w-full rounded-2xl bg-white p-6 shadow-soft-lg",
+              "relative max-h-[90vh] w-full overflow-y-auto rounded-2xl bg-white p-5 shadow-soft-lg",
               sizes[size]
             )}
           >
