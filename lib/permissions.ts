@@ -98,6 +98,15 @@ export type Permission =
   | "notifications.view"
   | "notifications.manage"
   | "notifications.send_system"
+  | "teacher.dashboard.view"
+  | "teacher.students.view"
+  | "teacher.attendance.manage"
+  | "teacher.grades.manage"
+  | "teacher.private_lessons.view"
+  | "teacher.finance.view"
+  | "teacher.schedule.view"
+  | "teacher.documents.view"
+  | "teacher.reports.view"
   | "transport.view"
   | "transport.manage"
   | "transport.record";
@@ -339,7 +348,18 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "transport.view",
     "transport.record",
   ],
-  teacher: [],
+  teacher: [
+    "teacher.dashboard.view",
+    "teacher.students.view",
+    "teacher.attendance.manage",
+    "teacher.grades.manage",
+    "teacher.private_lessons.view",
+    "teacher.finance.view",
+    "teacher.schedule.view",
+    "teacher.documents.view",
+    "teacher.reports.view",
+    "notifications.view",
+  ],
   student: [],
 };
 
