@@ -123,6 +123,15 @@ export type Permission =
   | "student.documents.view"
   | "student.reports.view"
   | "student.communications.view"
+  | "ai.view"
+  | "ai.use"
+  | "ai.admin"
+  | "ai.teacher"
+  | "ai.parent"
+  | "ai.student"
+  | "ai.data_query"
+  | "ai.manage_settings"
+  | "ai.view_audit"
   | "transport.view"
   | "transport.manage"
   | "transport.record";
@@ -226,6 +235,15 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "notifications.view",
     "notifications.manage",
     "notifications.send_system",
+    "ai.view",
+    "ai.use",
+    "ai.admin",
+    "ai.teacher",
+    "ai.parent",
+    "ai.student",
+    "ai.data_query",
+    "ai.manage_settings",
+    "ai.view_audit",
     "transport.view",
     "transport.manage",
     "transport.record",
@@ -309,6 +327,12 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "notifications.view",
     "notifications.manage",
     "notifications.send_system",
+    "ai.view",
+    "ai.use",
+    "ai.admin",
+    "ai.teacher",
+    "ai.data_query",
+    "ai.view_audit",
     "transport.view",
     "transport.manage",
     "transport.record",
@@ -361,6 +385,10 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "communications.export",
     "communications.view_delivery_logs",
     "notifications.view",
+    "ai.view",
+    "ai.use",
+    "ai.admin",
+    "ai.data_query",
     "transport.view",
     "transport.record",
   ],
@@ -375,6 +403,9 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "teacher.documents.view",
     "teacher.reports.view",
     "notifications.view",
+    "ai.view",
+    "ai.use",
+    "ai.teacher",
   ],
   parent: [
     "parent.dashboard.view",
@@ -385,6 +416,9 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "parent.reports.view",
     "parent.communications.view",
     "notifications.view",
+    "ai.view",
+    "ai.use",
+    "ai.parent",
   ],
   student: [
     "student.dashboard.view",
@@ -397,6 +431,9 @@ const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "student.reports.view",
     "student.communications.view",
     "notifications.view",
+    "ai.view",
+    "ai.use",
+    "ai.student",
   ],
 };
 
@@ -453,6 +490,9 @@ export function canAccessAdminPath(role: UserRole, pathname: string): boolean {
   }
   if (pathname.startsWith("/admin/notifications")) {
     return hasPermission(role, "notifications.view");
+  }
+  if (pathname.startsWith("/admin/ai")) {
+    return hasPermission(role, "ai.admin");
   }
   if (pathname.startsWith("/admin/transport")) {
     return hasAnyPermission(role, ["transport.view", "transport.manage", "transport.record"]);
